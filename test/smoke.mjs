@@ -260,5 +260,141 @@ assert(ae('same') === ae('same'), 'handles are cached singletons');
   d1(); d2();
 }
 
+// ===========================================================================
+// Regressions from the 2026-07-10 external review
+// ===========================================================================
+
+// --- F1: disposing an effect cancels its queued run --------------------------
+{
+  const s = ae.signal(0);
+  let runs = 0;
+  const dispose = effect(() => { runs++; void s.value; });
+  s.value = 1;   // queues the runner
+  dispose();     // must also cancel the queued run
+  await tick();
+  s.value = 2;   // must not resurrect it
+  await tick();
+  assert(runs === 1, `disposed effect never runs again (got ${runs} runs)`);
+}
+
+// --- F1b: no zombie render when removal precedes a write in the same task ---
+{
+  const s = ae.signal(0);
+  let renders = 0;
+  const node = el('<div data-ae="f1b"></div>');
+  await tick();
+  ae('f1b').render(() => { renders++; void s.value; });
+  node.remove();  // observer cleanup microtask runs before...
+  s.value = 1;    // ...the flush microtask for this write
+  await tick();
+  s.value = 2;
+  await tick();
+  assert(renders === 1, `render disposed by unmount cannot resurrect (got ${renders})`);
+}
+
+// --- F2: reparenting a connected element does not remount it -----------------
+{
+  let mounts = 0;
+  let cleanups = 0;
+  ae('f2').mount(() => { mounts++; return () => cleanups++; });
+  const a = el('<div></div>');
+  const b = el('<div></div>');
+  const node = document.createElement('div');
+  node.setAttribute('data-ae', 'f2');
+  a.appendChild(node);
+  await tick();
+  b.appendChild(node); // move within the document
+  await tick();
+  assert(mounts === 1 && cleanups === 0, `move is invisible to bindings (mounts=${mounts}, cleanups=${cleanups})`);
+  node.remove(); // real removal still cleans up
+  await tick();
+  assert(cleanups === 1, 'true removal after a move still runs cleanup');
+}
+
+// --- F3: multiple data-ae changes in one task bind the final name once -------
+{
+  let mounts = 0;
+  let cleanups = 0;
+  ae('f3-final').mount(() => { mounts++; return () => cleanups++; });
+  const node = el('<div data-ae="f3-start"></div>');
+  await tick();
+  node.setAttribute('data-ae', 'f3-mid');
+  node.setAttribute('data-ae', 'f3-final');
+  await tick();
+  assert(mounts === 1 && cleanups === 0, `a→b→c mounts final name once (mounts=${mounts}, cleanups=${cleanups})`);
+}
+
+// --- F3b: net no-op rename (a→b→a) leaves bindings untouched -----------------
+{
+  let mounts = 0;
+  let cleanups = 0;
+  ae('f3b').mount(() => { mounts++; return () => cleanups++; });
+  const node = el('<div data-ae="f3b"></div>');
+  await tick();
+  node.setAttribute('data-ae', 'f3b-other');
+  node.setAttribute('data-ae', 'f3b');
+  await tick();
+  assert(mounts === 1 && cleanups === 0, `a→b→a is a net no-op (mounts=${mounts}, cleanups=${cleanups})`);
+}
+
+// --- F3c: insert + rename in the same task mounts once -----------------------
+{
+  let mounts = 0;
+  ae('f3c-final').mount(() => { mounts++; });
+  const node = document.createElement('div');
+  node.setAttribute('data-ae', 'f3c-start');
+  document.body.appendChild(node);
+  node.setAttribute('data-ae', 'f3c-final'); // same task as insertion
+  await tick();
+  assert(mounts === 1, `insert+rename in one task mounts once (got ${mounts})`);
+}
+
+// --- F2/F3 edge: move + rename in one task rebinds cleanly (invariant I3) ----
+{
+  let mounts = 0;
+  let cleanups = 0;
+  let otherCleanups = 0;
+  ae('f23-old').mount(() => () => otherCleanups++);
+  ae('f23-new').mount(() => { mounts++; return () => cleanups++; });
+  const a = el('<div></div>');
+  const b = el('<div></div>');
+  const node = document.createElement('div');
+  node.setAttribute('data-ae', 'f23-old');
+  a.appendChild(node);
+  await tick();
+  b.appendChild(node);
+  node.setAttribute('data-ae', 'f23-new'); // move AND rename, same task
+  await tick();
+  assert(otherCleanups === 1, 'old-name bindings are cleaned on rename-during-move');
+  assert(mounts === 1 && cleanups === 0, `new name mounted exactly once (mounts=${mounts}, cleanups=${cleanups})`);
+}
+
+// --- F4: initial effect throw propagates AND leaves no subscriptions ---------
+{
+  const s = ae.signal(0);
+  let threw = false;
+  let runs = 0;
+  try {
+    effect(() => { runs++; void s.value; throw new Error('boom'); });
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'initial effect throw propagates to the caller');
+  s.value = 1;
+  await tick();
+  assert(runs === 1, `throwing initial run leaves no live subscription (got ${runs} runs)`);
+}
+
+// --- F5: control characters in handle names ----------------------------------
+{
+  const node = el('<div></div>');
+  node.setAttribute('data-ae', 'a\nb');
+  await tick();
+  assert(ae('a\nb').els.length === 1, '.els finds names containing a newline');
+  const msg = ae.signal('x');
+  ae('a\nb').text(msg);
+  assert(node.textContent === 'x', 'bindings work on control-character names');
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

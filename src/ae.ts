@@ -14,6 +14,8 @@ interface Runner {
   deps: Set<Set<Runner>>;
   /** Computed runners re-run synchronously to propagate invalidation. */
   sync?: boolean;
+  /** Flipped off by disposal; inactive runners never run again. */
+  active: boolean;
 }
 
 let activeRunner: Runner | null = null;
@@ -44,6 +46,9 @@ function flush(): void {
       const batch = [...queue];
       queue.clear();
       for (const run of batch) {
+        // A cleanup earlier in this batch may have disposed a later runner
+        // after it was already copied out of the queue.
+        if (!run.active) continue;
         try {
           run();
         } catch (err) {
@@ -57,6 +62,7 @@ function flush(): void {
 }
 
 function schedule(run: Runner): void {
+  if (!run.active) return;
   queue.add(run);
   if (!scheduled && !flushing) {
     scheduled = true;
@@ -99,12 +105,27 @@ function runTracked<T>(run: Runner, fn: () => T): T {
 /**
  * Auto-tracked side effect. Runs immediately; re-runs (batched on a
  * microtask) whenever a signal it read changes. Returns a disposer.
+ *
+ * If the INITIAL run throws, the error propagates to the caller and the
+ * effect leaves no trace (nothing subscribed, nothing queued). Errors in
+ * later runs are logged and isolated by the flush loop.
  */
 export function effect(fn: () => void): Cleanup {
   const runner = (() => runTracked(runner, fn)) as Runner;
   runner.deps = new Set();
-  runner();
-  return () => untrackAll(runner);
+  runner.active = true;
+  const dispose = () => {
+    runner.active = false;
+    queue.delete(runner);
+    untrackAll(runner);
+  };
+  try {
+    runner();
+  } catch (err) {
+    dispose();
+    throw err;
+  }
+  return dispose;
 }
 
 /** Writable reactive value. Reads are tracked inside effect/render/computed. */
@@ -153,6 +174,7 @@ export class Computed<T> {
     }) as Runner;
     runner.deps = new Set();
     runner.sync = true;
+    runner.active = true; // computed runners are never disposed
     this._runner = runner;
   }
 
@@ -201,6 +223,9 @@ function bindReactive<T>(
 type Binding = (el: HTMLElement) => Cleanup | void;
 
 interface Meta {
+  /** The data-ae name the element is currently mounted under. Invariant:
+   * `attached`/`cleanups` always belong to this name. */
+  name?: string;
   attached: Set<Binding>;
   cleanups: Cleanup[];
 }
@@ -233,6 +258,11 @@ function attach(el: HTMLElement, binding: Binding): void {
 function mountElement(el: HTMLElement): void {
   const name = el.dataset.ae;
   if (name === undefined) return;
+  const meta = getMeta(el);
+  // I3: attached bindings always belong to meta.name. Mounting under a
+  // different name (e.g. moved AND renamed in one task) rebinds cleanly.
+  if (meta.name !== undefined && meta.name !== name) unmountElement(el);
+  meta.name = name;
   const handle = handles.get(name);
   if (!handle) return;
   for (const binding of handle._bindings) attach(el, binding);
@@ -250,6 +280,7 @@ function unmountElement(el: HTMLElement): void {
   }
   meta.cleanups.length = 0;
   meta.attached.clear();
+  meta.name = undefined;
 }
 
 /** Visit root and its descendants that carry data-ae. */
@@ -261,7 +292,13 @@ function forEachMarked(root: Node, fn: (el: HTMLElement) => void): void {
 }
 
 function selectorFor(name: string): string {
-  return `[data-ae="${name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`;
+  // Quotes/backslashes get backslash-escaped; CSS string control characters
+  // (an unescaped newline is a CSS parse error) become hex escapes, whose
+  // trailing space is the escape terminator.
+  const escaped = name
+    .replace(/[\\"]/g, '\\$&')
+    .replace(/[\x00-\x1f\x7f]/g, (c) => `\\${c.charCodeAt(0).toString(16)} `);
+  return `[data-ae="${escaped}"]`;
 }
 
 // ---------------------------------------------------------------------------
@@ -440,21 +477,36 @@ const handles = new Map<string, Handle>();
 
 function initObserver(): void {
   const observer = new MutationObserver((records) => {
+    // The callback runs after ALL mutations settle, so element state
+    // (isConnected, current attribute value) is final — act on net state,
+    // not on intermediate records: moves and no-op renames must be
+    // invisible to bindings.
+    const attrChanges = new Map<HTMLElement, string | null>(); // el → oldest oldValue
     for (const record of records) {
       if (record.type === 'attributes') {
-        // data-ae added, removed, or renamed → rebind under the new name.
         const el = record.target as HTMLElement;
-        if (record.oldValue === el.getAttribute('data-ae')) continue;
-        unmountElement(el);
-        if (el.isConnected && el.dataset.ae !== undefined) mountElement(el);
+        if (!attrChanges.has(el)) attrChanges.set(el, record.oldValue);
         continue;
       }
-      for (const node of record.removedNodes) forEachMarked(node, unmountElement);
+      for (const node of record.removedNodes) {
+        forEachMarked(node, (el) => {
+          if (!el.isConnected) unmountElement(el); // reparented ≠ removed
+        });
+      }
       for (const node of record.addedNodes) {
         forEachMarked(node, (el) => {
           if (el.isConnected) mountElement(el);
         });
       }
+    }
+    for (const [el, oldestValue] of attrChanges) {
+      const current = el.getAttribute('data-ae');
+      if (oldestValue === current) continue; // net no-op rename (a→b→a)
+      // Already mounted under the final name (e.g. inserted and renamed in
+      // the same task — the addition record mounted the final name above).
+      if (metadata.get(el)?.name === current) continue;
+      unmountElement(el);
+      if (el.isConnected && current !== null) mountElement(el);
     }
   });
   observer.observe(document.body, {

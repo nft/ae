@@ -131,9 +131,19 @@ Apply to every element in the handle. Sugar — everything is also doable inside
   `effect` runs at most once per flush.
 - **Disposal**: when an element leaves the DOM, its mount cleanups run, its
   render effects are disposed, and its event listeners are removed. Re-adding
-  the element re-binds everything. No manual unbinding, no leaks.
-- **Fault isolation**: a throwing binding, effect, or cleanup is logged via
-  `console.error` and does not prevent the others from running.
+  the element re-binds everything. Disposal is absolute: a disposed effect
+  never runs again, even if it was already queued for the current flush.
+  No manual unbinding, no leaks.
+- **Net-state lifecycle**: mount/cleanup reflect the *net* DOM change per
+  task, not intermediate mutations. Moving a connected element to another
+  parent does not remount it; renaming `data-ae` a→b→a is a no-op; multiple
+  renames in one task bind the final name exactly once.
+- **Fault isolation**: a throwing binding, cleanup, or effect *re-run* is
+  logged via `console.error` and does not prevent the others from running.
+  The one exception: an `ae.effect` whose **initial** run throws propagates
+  the error synchronously to the caller and leaves no trace (nothing
+  subscribed, nothing queued). Element bindings (`.render`/`.mount`) are
+  always isolated, including their first run.
 - **Runaway guard**: an effect that writes a signal it also reads trips a
   circuit breaker after 100 flush cycles (with a `console.error`) instead of
   hanging the tab.
