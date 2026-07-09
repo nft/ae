@@ -1,0 +1,501 @@
+// ae — tiny attribute-based behavior + reactivity lib.
+// HTML is the source of truth (data-ae markers); ae attaches behavior to it.
+// No virtual DOM, no hydration, no templates.
+
+export type Cleanup = () => void;
+
+// ---------------------------------------------------------------------------
+// Reactivity core
+// ---------------------------------------------------------------------------
+
+interface Runner {
+  (): void;
+  /** Dependency sets this runner is subscribed to, for O(1) unsubscribe. */
+  deps: Set<Set<Runner>>;
+  /** Computed runners re-run synchronously to propagate invalidation. */
+  sync?: boolean;
+}
+
+let activeRunner: Runner | null = null;
+
+const queue = new Set<Runner>();
+let flushing = false;
+let scheduled = false;
+
+// Circuit breaker: an effect that writes a signal it also reads would
+// otherwise loop synchronously forever inside flush().
+const MAX_FLUSH_CYCLES = 100;
+
+function flush(): void {
+  scheduled = false;
+  if (flushing) return;
+  flushing = true;
+  try {
+    let cycles = 0;
+    while (queue.size > 0) {
+      if (++cycles > MAX_FLUSH_CYCLES) {
+        queue.clear();
+        console.error(
+          '[ae] update flush aborted after ' + MAX_FLUSH_CYCLES +
+          ' cycles — an effect is probably writing a signal it also reads',
+        );
+        return;
+      }
+      const batch = [...queue];
+      queue.clear();
+      for (const run of batch) {
+        try {
+          run();
+        } catch (err) {
+          console.error('[ae] effect threw:', err);
+        }
+      }
+    }
+  } finally {
+    flushing = false;
+  }
+}
+
+function schedule(run: Runner): void {
+  queue.add(run);
+  if (!scheduled && !flushing) {
+    scheduled = true;
+    queueMicrotask(flush);
+  }
+}
+
+function track(subs: Set<Runner>): void {
+  if (activeRunner) {
+    subs.add(activeRunner);
+    activeRunner.deps.add(subs);
+  }
+}
+
+function notify(subs: Set<Runner>): void {
+  // Copy: sync runners re-track themselves mid-iteration.
+  for (const run of [...subs]) {
+    if (run.sync) run();
+    else schedule(run);
+  }
+}
+
+function untrackAll(run: Runner): void {
+  for (const subs of run.deps) subs.delete(run);
+  run.deps.clear();
+}
+
+/** Run fn with `run` as the active subscriber, re-tracking deps from scratch. */
+function runTracked<T>(run: Runner, fn: () => T): T {
+  untrackAll(run);
+  const prev = activeRunner;
+  activeRunner = run;
+  try {
+    return fn();
+  } finally {
+    activeRunner = prev;
+  }
+}
+
+/**
+ * Auto-tracked side effect. Runs immediately; re-runs (batched on a
+ * microtask) whenever a signal it read changes. Returns a disposer.
+ */
+export function effect(fn: () => void): Cleanup {
+  const runner = (() => runTracked(runner, fn)) as Runner;
+  runner.deps = new Set();
+  runner();
+  return () => untrackAll(runner);
+}
+
+/** Writable reactive value. Reads are tracked inside effect/render/computed. */
+export class Signal<T> {
+  /** @internal */
+  readonly _subs = new Set<Runner>();
+  private _value: T;
+
+  constructor(initial: T) {
+    this._value = initial;
+  }
+
+  get value(): T {
+    track(this._subs);
+    return this._value;
+  }
+
+  set value(next: T) {
+    if (Object.is(this._value, next)) return;
+    this._value = next;
+    notify(this._subs);
+  }
+}
+
+/**
+ * Derived read-only value. Lazy until first read; after that it re-computes
+ * when a dependency changes and only notifies subscribers when the computed
+ * value actually changed (Object.is), so unchanged results cause no renders.
+ */
+export class Computed<T> {
+  /** @internal */
+  readonly _subs = new Set<Runner>();
+  private _value!: T;
+  private _hot = false;
+  private readonly _runner: Runner;
+  private readonly _fn: () => T;
+
+  constructor(fn: () => T) {
+    this._fn = fn;
+    const runner = (() => {
+      const next = runTracked(runner, this._fn);
+      if (!Object.is(next, this._value)) {
+        this._value = next;
+        notify(this._subs);
+      }
+    }) as Runner;
+    runner.deps = new Set();
+    runner.sync = true;
+    this._runner = runner;
+  }
+
+  get value(): T {
+    track(this._subs);
+    if (!this._hot) {
+      this._hot = true;
+      this._value = runTracked(this._runner, this._fn);
+    }
+    return this._value;
+  }
+}
+
+export type ReadableSignal<T> = Signal<T> | Computed<T>;
+
+export function isSignal(v: unknown): v is ReadableSignal<unknown> {
+  return v instanceof Signal || v instanceof Computed;
+}
+
+/**
+ * Value accepted by the imperative helpers: a plain value (applied once),
+ * a signal (applied reactively), or a function of the element (applied
+ * reactively, auto-tracked).
+ */
+export type Reactive<T> = T | ReadableSignal<T> | ((el: HTMLElement) => T);
+
+function bindReactive<T>(
+  v: Reactive<T>,
+  el: HTMLElement,
+  apply: (el: HTMLElement, value: T) => void,
+): Cleanup | void {
+  if (isSignal(v)) return effect(() => apply(el, (v as ReadableSignal<T>).value));
+  if (typeof v === 'function') return effect(() => apply(el, (v as (el: HTMLElement) => T)(el)));
+  apply(el, v);
+}
+
+// ---------------------------------------------------------------------------
+// DOM lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * A binding attaches one behavior to one element and may return a cleanup.
+ * Everything — mount, render, events, helpers — is a binding, attached when
+ * the element is (or becomes) connected and cleaned up when it is removed.
+ */
+type Binding = (el: HTMLElement) => Cleanup | void;
+
+interface Meta {
+  attached: Set<Binding>;
+  cleanups: Cleanup[];
+}
+
+const metadata = new WeakMap<HTMLElement, Meta>();
+
+function getMeta(el: HTMLElement): Meta {
+  let meta = metadata.get(el);
+  if (!meta) {
+    meta = { attached: new Set(), cleanups: [] };
+    metadata.set(el, meta);
+  }
+  return meta;
+}
+
+function attach(el: HTMLElement, binding: Binding): void {
+  const meta = getMeta(el);
+  if (meta.attached.has(binding)) return;
+  meta.attached.add(binding);
+  let cleanup: Cleanup | void;
+  try {
+    cleanup = binding(el);
+  } catch (err) {
+    console.error('[ae] binding threw:', err);
+    return;
+  }
+  if (typeof cleanup === 'function') meta.cleanups.push(cleanup);
+}
+
+function mountElement(el: HTMLElement): void {
+  const name = el.dataset.ae;
+  if (name === undefined) return;
+  const handle = handles.get(name);
+  if (!handle) return;
+  for (const binding of handle._bindings) attach(el, binding);
+}
+
+function unmountElement(el: HTMLElement): void {
+  const meta = metadata.get(el);
+  if (!meta) return;
+  for (const cleanup of meta.cleanups) {
+    try {
+      cleanup();
+    } catch (err) {
+      console.error('[ae] cleanup threw:', err);
+    }
+  }
+  meta.cleanups.length = 0;
+  meta.attached.clear();
+}
+
+/** Visit root and its descendants that carry data-ae. */
+function forEachMarked(root: Node, fn: (el: HTMLElement) => void): void {
+  if (root.nodeType !== 1 /* ELEMENT_NODE */) return;
+  const el = root as HTMLElement;
+  if (el.dataset?.ae !== undefined) fn(el);
+  el.querySelectorAll<HTMLElement>('[data-ae]').forEach(fn);
+}
+
+function selectorFor(name: string): string {
+  return `[data-ae="${name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`;
+}
+
+// ---------------------------------------------------------------------------
+// Handle
+// ---------------------------------------------------------------------------
+
+// Elements the browser natively activates via keyboard (Enter/Space already
+// synthesize a click) or where keys mean text entry. press() must not add its
+// own keydown for these: it would double-fire or hijack typing.
+const NATIVE_PRESS =
+  'button, a[href], input, select, textarea, summary, [contenteditable=""], [contenteditable="true"]';
+
+export type PressEvent = MouseEvent | KeyboardEvent;
+
+/**
+ * Live handle for all elements carrying data-ae="name" — current ones and any
+ * connected later (one shared MutationObserver). All methods chain.
+ * Callbacks always receive the matching element first: fn(el, ...).
+ */
+export class Handle {
+  /** @internal */
+  readonly _bindings: Binding[] = [];
+
+  constructor(readonly name: string) {}
+
+  /** Plain array of currently matching elements. */
+  get els(): HTMLElement[] {
+    return Array.from(document.querySelectorAll<HTMLElement>(selectorFor(this.name)));
+  }
+
+  /** Run fn over current elements once. Not reactive, not for future ones. */
+  each(fn: (el: HTMLElement) => void): this {
+    for (const el of this.els) fn(el);
+    return this;
+  }
+
+  private _bind(binding: Binding): this {
+    this._bindings.push(binding);
+    for (const el of this.els) {
+      if (el.isConnected) attach(el, binding);
+    }
+    return this;
+  }
+
+  /**
+   * Runs fn(el) once per matching element — immediately for connected ones,
+   * and for any element connected later. A returned function runs as cleanup
+   * when the element leaves the DOM.
+   */
+  mount(fn: (el: HTMLElement) => Cleanup | void): this {
+    return this._bind(fn);
+  }
+
+  /**
+   * Runs fn(el) per element, auto-tracking every signal read inside.
+   * Re-runs when any of them changes. Disposed when the element is removed.
+   */
+  render(fn: (el: HTMLElement) => void): this {
+    return this._bind((el) => effect(() => fn(el)));
+  }
+
+  /** Any DOM event, attached per element (non-bubbling events work). */
+  on<K extends keyof HTMLElementEventMap>(
+    type: K,
+    fn: (el: HTMLElement, ev: HTMLElementEventMap[K]) => void,
+    opts?: AddEventListenerOptions,
+  ): this;
+  on(type: string, fn: (el: HTMLElement, ev: Event) => void, opts?: AddEventListenerOptions): this;
+  on(
+    type: string,
+    fn: (el: HTMLElement, ev: Event) => void,
+    opts?: AddEventListenerOptions,
+  ): this {
+    return this._bind((el) => {
+      const handler = (ev: Event) => fn(el, ev);
+      el.addEventListener(type, handler, opts);
+      return () => el.removeEventListener(type, handler, opts);
+    });
+  }
+
+  /**
+   * Activation: click for everyone; Enter/Space keydown only for elements the
+   * browser does not natively activate (e.g. div[tabindex], [role=button]).
+   * Native buttons/links rely on their built-in Enter/Space→click, and text
+   * fields are never hijacked.
+   */
+  press(fn: (el: HTMLElement, ev: PressEvent) => void): this {
+    return this._bind((el) => {
+      const onClick = (ev: MouseEvent) => fn(el, ev);
+      el.addEventListener('click', onClick);
+
+      if (el.matches(NATIVE_PRESS)) {
+        return () => el.removeEventListener('click', onClick);
+      }
+
+      const onKeydown = (ev: KeyboardEvent) => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault(); // Space must not scroll the page
+        fn(el, ev);
+      };
+      el.addEventListener('keydown', onKeydown);
+      return () => {
+        el.removeEventListener('click', onClick);
+        el.removeEventListener('keydown', onKeydown);
+      };
+    });
+  }
+
+  /** pointerenter / pointerleave per element — nesting-safe by construction. */
+  hover(
+    enter?: (el: HTMLElement, ev: PointerEvent) => void,
+    leave?: (el: HTMLElement, ev: PointerEvent) => void,
+  ): this {
+    return this._bind((el) => {
+      const onEnter = (ev: Event) => enter?.(el, ev as PointerEvent);
+      const onLeave = (ev: Event) => leave?.(el, ev as PointerEvent);
+      el.addEventListener('pointerenter', onEnter);
+      el.addEventListener('pointerleave', onLeave);
+      return () => {
+        el.removeEventListener('pointerenter', onEnter);
+        el.removeEventListener('pointerleave', onLeave);
+      };
+    });
+  }
+
+  /** textContent. Plain value applies once; signal or function is reactive. */
+  text(v: Reactive<string | number>): this {
+    return this._bind((el) =>
+      bindReactive(v, el, (target, value) => {
+        target.textContent = String(value);
+      }),
+    );
+  }
+
+  /** classList.toggle(name, on). Omit `on` for a one-shot plain toggle. */
+  cls(name: string, on?: Reactive<boolean>): this {
+    return this._bind((el) => {
+      if (on === undefined) {
+        el.classList.toggle(name);
+        return;
+      }
+      return bindReactive(on, el, (target, value) => {
+        target.classList.toggle(name, !!value);
+      });
+    });
+  }
+
+  /** Set attribute; null/undefined/false removes it, true sets it empty. */
+  attr(name: string, v: Reactive<string | number | boolean | null | undefined>): this {
+    return this._bind((el) =>
+      bindReactive(v, el, (target, value) => {
+        if (value === null || value === undefined || value === false) {
+          target.removeAttribute(name);
+        } else {
+          target.setAttribute(name, value === true ? '' : String(value));
+        }
+      }),
+    );
+  }
+
+  /** Toggle the hidden property. */
+  show(on: Reactive<boolean>): this {
+    return this._bind((el) =>
+      bindReactive(on, el, (target, value) => {
+        target.hidden = !value;
+      }),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Registry & observer
+// ---------------------------------------------------------------------------
+
+const handles = new Map<string, Handle>();
+
+function initObserver(): void {
+  const observer = new MutationObserver((records) => {
+    for (const record of records) {
+      if (record.type === 'attributes') {
+        // data-ae added, removed, or renamed → rebind under the new name.
+        const el = record.target as HTMLElement;
+        if (record.oldValue === el.getAttribute('data-ae')) continue;
+        unmountElement(el);
+        if (el.isConnected && el.dataset.ae !== undefined) mountElement(el);
+        continue;
+      }
+      for (const node of record.removedNodes) forEachMarked(node, unmountElement);
+      for (const node of record.addedNodes) {
+        forEachMarked(node, (el) => {
+          if (el.isConnected) mountElement(el);
+        });
+      }
+    }
+  });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['data-ae'],
+    attributeOldValue: true,
+  });
+  forEachMarked(document.body, mountElement);
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initObserver);
+  } else {
+    initObserver();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * ae('name') → cached live Handle for [data-ae="name"].
+ * ae.signal / ae.computed / ae.effect / ae.isSignal — reactivity primitives.
+ */
+export const ae = Object.assign(
+  (name: string): Handle => {
+    let handle = handles.get(name);
+    if (!handle) {
+      handle = new Handle(name);
+      handles.set(name, handle);
+    }
+    return handle;
+  },
+  {
+    signal: <T>(initial: T): Signal<T> => new Signal(initial),
+    computed: <T>(fn: () => T): Computed<T> => new Computed(fn),
+    effect,
+    isSignal,
+  },
+);
