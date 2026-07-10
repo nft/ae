@@ -122,6 +122,12 @@ Apply to every element in the handle. Sugar — everything is also doable inside
 | `.attr(name, v)` | set attribute; `null`/`undefined`/`false` removes it, `true` sets it empty |
 | `.show(on)` | toggle `hidden` |
 
+### Forms
+
+| method | behavior |
+|---|---|
+| `.input(signal)` | Two-way binding, wired by field type: text-like inputs / `<textarea>` / `<select>` ↔ `Signal<string>` via `value`; `type=checkbox` ↔ `Signal<boolean>` via `checked`; `type=number\|range` ↔ `Signal<number>` via `valueAsNumber` (empty field reads as `NaN`). Signal → field is reactive; field → signal on `input`/`change`. Writes are equality-guarded, so echoes never move the caret. Several fields bound to one signal mirror each other. Radio groups and multi-select are out of scope — use `.on` directly. Non-form elements log an error and no-op. |
+
 ### Lists
 
 ```html

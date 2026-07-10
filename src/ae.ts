@@ -469,6 +469,54 @@ export class Handle {
   }
 
   /**
+   * Two-way form binding — sugar over `.render` + `.on('input')`.
+   *
+   * Field type decides the wiring per element:
+   * - text-like inputs, <textarea>, <select>  → Signal<string>  ↔ value
+   * - input[type=checkbox]                    → Signal<boolean> ↔ checked
+   * - input[type=number|range]                → Signal<number>  ↔ valueAsNumber
+   *   (an empty number field reads as NaN; writing NaN clears it)
+   *
+   * Signal → element is reactive; element → signal fires on input/change.
+   * Writes are equality-guarded so echoes never move the caret. Radio groups
+   * and multi-select are out of scope — use `.on` directly.
+   */
+  input<T extends string | number | boolean>(sig: Signal<T>): this {
+    return this._bind((el) => {
+      const tag = el.tagName;
+      const type = tag === 'INPUT' ? (el as HTMLInputElement).type : '';
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+        console.error('[ae] .input target is not a form field:', el);
+        return;
+      }
+      const field = el as HTMLInputElement;
+      const mode: 'checked' | 'number' | 'value' =
+        type === 'checkbox' ? 'checked' : type === 'number' || type === 'range' ? 'number' : 'value';
+
+      const read = (): unknown =>
+        mode === 'checked' ? field.checked : mode === 'number' ? field.valueAsNumber : field.value;
+      const write = (v: unknown): void => {
+        if (Object.is(read(), v)) return; // echo guard: never disturb the caret
+        if (mode === 'checked') field.checked = !!v;
+        else if (mode === 'number') field.valueAsNumber = Number(v);
+        else field.value = String(v);
+      };
+
+      const disposeRender = effect(() => write(sig.value));
+      const onInput = () => {
+        (sig as Signal<unknown>).value = read();
+      };
+      el.addEventListener('input', onInput);
+      el.addEventListener('change', onInput);
+      return () => {
+        disposeRender();
+        el.removeEventListener('input', onInput);
+        el.removeEventListener('change', onInput);
+      };
+    });
+  }
+
+  /**
    * Keyed list stamping. The container's <template> (one root element)
    * provides the item prototype; stamped nodes are kept at the end of the
    * container in item order.

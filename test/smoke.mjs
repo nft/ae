@@ -561,5 +561,129 @@ const listContainer = (name) =>
   assert(p['p-root'] === undefined, 'the root itself is not one of its parts');
 }
 
+// ===========================================================================
+// .input()
+// ===========================================================================
+
+const fireInput = (node) => node.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+
+// --- text input: string signal, both directions --------------------------------
+{
+  const field = el('<input data-ae="i-text">');
+  await tick();
+  const name = ae.signal('ada');
+  ae('i-text').input(name);
+  assert(field.value === 'ada', 'input(): signal → value on bind');
+  name.value = 'grace';
+  await tick();
+  assert(field.value === 'grace', 'input(): signal change updates the field');
+  field.value = 'linus';
+  fireInput(field);
+  assert(name.value === 'linus', 'input(): typing updates the signal');
+}
+
+// --- checkbox: boolean signal ---------------------------------------------------
+{
+  const box = el('<input type="checkbox" data-ae="i-check">');
+  await tick();
+  const on = ae.signal(true);
+  ae('i-check').input(on);
+  assert(box.checked === true, 'checkbox: signal → checked on bind');
+  on.value = false;
+  await tick();
+  assert(box.checked === false, 'checkbox: signal change updates checked');
+  box.checked = true;
+  fireInput(box);
+  assert(on.value === true, 'checkbox: toggling updates the signal');
+}
+
+// --- number input: number signal ------------------------------------------------
+{
+  const num = el('<input type="number" data-ae="i-num">');
+  await tick();
+  const qty = ae.signal(3);
+  ae('i-num').input(qty);
+  assert(num.value === '3', 'number: signal → valueAsNumber on bind');
+  qty.value = 7;
+  await tick();
+  assert(num.value === '7', 'number: signal change updates the field');
+  num.value = '42';
+  fireInput(num);
+  assert(qty.value === 42, 'number: typing yields a number, not a string');
+  num.value = '';
+  fireInput(num);
+  assert(Number.isNaN(qty.value), 'number: empty field reads as NaN');
+}
+
+// --- textarea and select ---------------------------------------------------------
+{
+  const area = el('<textarea data-ae="i-area"></textarea>');
+  const sel = el('<select data-ae="i-sel"><option value="a">A</option><option value="b">B</option></select>');
+  await tick();
+  const note = ae.signal('hello');
+  const pick = ae.signal('b');
+  ae('i-area').input(note);
+  ae('i-sel').input(pick);
+  assert(area.value === 'hello', 'textarea binds value');
+  assert(sel.value === 'b', 'select binds value');
+  sel.value = 'a';
+  fireInput(sel);
+  assert(pick.value === 'a', 'select change updates the signal');
+}
+
+// --- echo guard: user edit does not get clobbered by the flush -------------------
+{
+  const field = el('<input data-ae="i-echo">');
+  await tick();
+  const s = ae.signal('start');
+  ae('i-echo').input(s);
+  field.value = 'typed';
+  fireInput(field);
+  await tick(); // flush would echo the write back
+  assert(field.value === 'typed', 'echo write is suppressed when values already match');
+  assert(s.value === 'typed', 'signal holds the typed value after flush');
+}
+
+// --- two fields, one signal: mirrored --------------------------------------------
+{
+  const f1 = el('<input data-ae="i-mirror">');
+  const f2 = el('<input data-ae="i-mirror">');
+  await tick();
+  const s = ae.signal('');
+  ae('i-mirror').input(s);
+  f1.value = 'sync';
+  fireInput(f1);
+  await tick();
+  assert(f2.value === 'sync', 'two fields bound to one signal mirror each other');
+}
+
+// --- non-form element: logged, no crash -------------------------------------------
+{
+  el('<div data-ae="i-bad"></div>');
+  await tick();
+  const origError = console.error;
+  let warned = false;
+  console.error = (...args) => { if (String(args[0]).includes('not a form field')) warned = true; };
+  ae('i-bad').input(ae.signal(''));
+  console.error = origError;
+  assert(warned, '.input on a non-form element logs and no-ops');
+}
+
+// --- unmount detaches the binding ---------------------------------------------------
+{
+  const field = el('<input data-ae="i-gone">');
+  await tick();
+  const s = ae.signal('a');
+  ae('i-gone').input(s);
+  field.remove();
+  await tick();
+  s.value = 'b';
+  await tick();
+  assert(field.value === 'a', 'removed field no longer receives signal writes');
+  field.value = 'c';
+  fireInput(field);
+  assert(s.value === 'b', 'removed field no longer writes to the signal');
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
