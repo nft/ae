@@ -467,6 +467,109 @@ export class Handle {
       }),
     );
   }
+
+  /**
+   * Keyed list stamping. The container's <template> (one root element)
+   * provides the item prototype; stamped nodes are kept at the end of the
+   * container in item order.
+   *
+   * `render(el, item, index)` runs per stamped node inside its own effect —
+   * it re-runs when the item is replaced (by key), when the index moves, or
+   * when any signal read inside changes. Reused keys keep their DOM node;
+   * reordering moves nodes without remounting their data-ae bindings.
+   *
+   * `key` defaults to item identity. Duplicate keys are logged and the
+   * duplicate gets a fresh, non-reused node.
+   */
+  list<T>(
+    items: Reactive<readonly T[]>,
+    render: (el: HTMLElement, item: T, index: number) => void,
+    key: (item: T, index: number) => unknown = (item) => item,
+  ): this {
+    interface Rec {
+      node: HTMLElement;
+      item: Signal<T>;
+      index: Signal<number>;
+      dispose: Cleanup;
+    }
+    return this._bind((container) => {
+      const template =
+        container.querySelector(':scope > template') ?? container.querySelector('template');
+      if (!(template instanceof HTMLTemplateElement)) {
+        console.error('[ae] .list container has no <template>:', container);
+        return;
+      }
+      const proto = template.content.firstElementChild;
+      if (!proto || proto !== template.content.lastElementChild) {
+        console.error('[ae] .list <template> must have exactly one root element:', container);
+        return;
+      }
+
+      let records = new Map<unknown, Rec>();
+
+      const removeRec = (rec: Rec) => {
+        rec.dispose();
+        rec.node.remove();
+      };
+
+      const disposeReconcile = effect(() => {
+        const arr = isSignal(items)
+          ? (items as ReadableSignal<readonly T[]>).value
+          : typeof items === 'function'
+            ? (items as (el: HTMLElement) => readonly T[])(container)
+            : items;
+
+        const next = new Map<unknown, Rec>();
+        const order: Rec[] = [];
+        let warnedDup = false;
+
+        for (let i = 0; i < arr.length; i++) {
+          const item = arr[i];
+          let k = key(item, i);
+          if (next.has(k)) {
+            if (!warnedDup) {
+              warnedDup = true;
+              console.error('[ae] .list duplicate key, falling back to unkeyed node:', k);
+            }
+            k = Symbol('ae.dup');
+          }
+          let rec = records.get(k);
+          if (rec) {
+            records.delete(k);
+            rec.item.value = item;
+            rec.index.value = i;
+          } else {
+            const node = proto.cloneNode(true) as HTMLElement;
+            const itemSig = new Signal(item);
+            const indexSig = new Signal(i);
+            const dispose = effect(() => render(node, itemSig.value, indexSig.value));
+            rec = { node, item: itemSig, index: indexSig, dispose };
+          }
+          next.set(k, rec);
+          order.push(rec);
+        }
+
+        for (const rec of records.values()) removeRec(rec); // vanished keys
+        records = next;
+
+        // Position nodes back-to-front; only mispositioned ones move.
+        let anchor: Node | null = null;
+        for (let i = order.length - 1; i >= 0; i--) {
+          const node = order[i].node;
+          if (node.parentNode !== container || node.nextSibling !== anchor) {
+            container.insertBefore(node, anchor);
+          }
+          anchor = node;
+        }
+      });
+
+      return () => {
+        disposeReconcile();
+        for (const rec of records.values()) removeRec(rec);
+        records.clear();
+      };
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -474,6 +577,27 @@ export class Handle {
 // ---------------------------------------------------------------------------
 
 const handles = new Map<string, Handle>();
+
+const partsCache = new WeakMap<HTMLElement, Record<string, HTMLElement>>();
+
+/**
+ * Named lookup of data-ae descendants: ae.parts(el).title instead of
+ * el.querySelector('[data-ae="title"]'). First match wins on duplicate
+ * names. Cached per root — intended for template-stamped nodes, whose
+ * structure is static; don't use it on subtrees you restructure.
+ */
+export function parts(root: HTMLElement): Record<string, HTMLElement> {
+  let map = partsCache.get(root);
+  if (!map) {
+    map = Object.create(null) as Record<string, HTMLElement>;
+    for (const el of root.querySelectorAll<HTMLElement>('[data-ae]')) {
+      const name = el.dataset.ae;
+      if (name !== undefined && !(name in map)) map[name] = el;
+    }
+    partsCache.set(root, map);
+  }
+  return map;
+}
 
 function initObserver(): void {
   const observer = new MutationObserver((records) => {
@@ -549,5 +673,6 @@ export const ae = Object.assign(
     computed: <T>(fn: () => T): Computed<T> => new Computed(fn),
     effect,
     isSignal,
+    parts,
   },
 );

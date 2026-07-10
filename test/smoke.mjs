@@ -4,7 +4,7 @@
 import { JSDOM } from 'jsdom';
 
 const dom = new JSDOM('<!doctype html><html><body></body></html>');
-for (const key of ['window', 'document', 'MutationObserver', 'HTMLElement', 'Event', 'MouseEvent', 'KeyboardEvent', 'Node']) {
+for (const key of ['window', 'document', 'MutationObserver', 'HTMLElement', 'HTMLTemplateElement', 'Event', 'MouseEvent', 'KeyboardEvent', 'Node']) {
   globalThis[key] = key === 'window' ? dom.window : dom.window[key];
 }
 
@@ -394,6 +394,171 @@ assert(ae('same') === ae('same'), 'handles are cached singletons');
   const msg = ae.signal('x');
   ae('a\nb').text(msg);
   assert(node.textContent === 'x', 'bindings work on control-character names');
+}
+
+// ===========================================================================
+// .list()
+// ===========================================================================
+
+const listContainer = (name) =>
+  el(`<ul data-ae="${name}"><template><li><span class="t"></span></li></template></ul>`);
+
+// --- basic stamp + keyed in-place update ------------------------------------
+{
+  const ul = listContainer('l-basic');
+  await tick();
+  const todos = ae.signal([
+    { id: 1, text: 'one' },
+    { id: 2, text: 'two' },
+  ]);
+  let renders = 0;
+  ae('l-basic').list(
+    todos,
+    (node, todo) => { renders++; node.querySelector('.t').textContent = todo.text; },
+    (todo) => todo.id,
+  );
+  const lis = () => [...ul.querySelectorAll('li')];
+  assert(lis().length === 2, 'list stamps one node per item');
+  assert(lis()[0].textContent === 'one' && lis()[1].textContent === 'two', 'list renders item content');
+
+  const nodeBefore = lis()[1];
+  const rendersBefore = renders;
+  todos.value = [{ id: 1, text: 'one' }, { id: 2, text: 'TWO' }];
+  await tick();
+  assert(lis()[1] === nodeBefore, 'keyed update reuses the same DOM node');
+  assert(lis()[1].textContent === 'TWO', 'keyed update re-renders changed item');
+  assert(renders === rendersBefore + 2, `only the changed item re-renders (got ${renders - rendersBefore} extra)`);
+  // note: +2 because id:1's item object is also new by reference → its signal changes
+}
+
+// --- Object.is cut-off: identical item references do not re-render -----------
+{
+  listContainer('l-cutoff');
+  await tick();
+  const a = { id: 'a', text: 'A' };
+  const b = { id: 'b', text: 'B' };
+  const items = ae.signal([a, b]);
+  let renders = 0;
+  ae('l-cutoff').list(items, () => { renders++; }, (x) => x.id);
+  const before = renders;
+  items.value = [a, b]; // new array, same refs, same order
+  await tick();
+  assert(renders === before, 'unchanged items (same ref, same index) do not re-render');
+}
+
+// --- removal ------------------------------------------------------------------
+{
+  const ul = listContainer('l-remove');
+  await tick();
+  const items = ae.signal(['x', 'y', 'z']);
+  ae('l-remove').list(items, (node, item) => { node.querySelector('.t').textContent = item; });
+  assert(ul.querySelectorAll('li').length === 3, 'three items stamped');
+  items.value = ['x', 'z'];
+  await tick();
+  const texts = [...ul.querySelectorAll('li')].map((n) => n.textContent);
+  assert(texts.join(',') === 'x,z', `vanished key removes its node (got ${texts.join(',')})`);
+}
+
+// --- reorder preserves node identity and inner data-ae bindings ---------------
+{
+  const ul = el(`<ul data-ae="l-order"><template><li data-ae="l-order-item"><span class="t"></span></li></template></ul>`);
+  await tick();
+  let mounts = 0;
+  let cleanups = 0;
+  ae('l-order-item').mount(() => { mounts++; return () => cleanups++; });
+  const items = ae.signal([{ k: 1 }, { k: 2 }, { k: 3 }]);
+  ae('l-order').list(items, (node, it) => { node.querySelector('.t').textContent = `${it.k}`; }, (it) => it.k);
+  await tick(); // let observer mount the stamped nodes
+  const before = [...ul.querySelectorAll('li')];
+  assert(mounts === 3, `inner data-ae bindings mount per stamped node (got ${mounts})`);
+  items.value = [items.value[2], items.value[1], items.value[0]]; // reverse
+  await tick();
+  const after = [...ul.querySelectorAll('li')];
+  assert(after[0] === before[2] && after[2] === before[0], 'reorder moves existing nodes');
+  assert(after.map((n) => n.textContent).join(',') === '3,2,1', 'reorder reflects new order');
+  assert(mounts === 3 && cleanups === 0, `reorder does not remount inner bindings (mounts=${mounts}, cleanups=${cleanups})`);
+}
+
+// --- duplicate keys: logged, both render --------------------------------------
+{
+  const ul = listContainer('l-dup');
+  await tick();
+  const origError = console.error;
+  let warned = false;
+  console.error = (...args) => { if (String(args[0]).includes('duplicate key')) warned = true; };
+  ae('l-dup').list([{ id: 1, t: 'a' }, { id: 1, t: 'b' }], (node, it) => {
+    node.querySelector('.t').textContent = it.t;
+  }, (it) => it.id);
+  console.error = origError;
+  const texts = [...ul.querySelectorAll('li')].map((n) => n.textContent);
+  assert(warned, 'duplicate key logs a console.error');
+  assert(texts.join(',') === 'a,b', `both duplicate-key items still render (got ${texts.join(',')})`);
+}
+
+// --- plain array stamps once ---------------------------------------------------
+{
+  const ul = listContainer('l-static');
+  await tick();
+  ae('l-static').list(['a', 'b'], (node, item) => { node.querySelector('.t').textContent = item; });
+  assert(ul.querySelectorAll('li').length === 2, 'plain array stamps once');
+}
+
+// --- container unmount disposes reconciler and item effects --------------------
+{
+  const ul = listContainer('l-dispose');
+  await tick();
+  const items = ae.signal(['a']);
+  const dep = ae.signal(0);
+  let renders = 0;
+  ae('l-dispose').list(items, () => { renders++; void dep.value; });
+  assert(renders === 1, 'item effect ran');
+  ul.remove();
+  await tick();
+  dep.value = 1;      // must not re-run item render
+  items.value = ['a', 'b']; // must not re-run reconciler
+  await tick();
+  assert(renders === 1, `unmounted list is fully disposed (got ${renders} renders)`);
+}
+
+// --- missing template: logged, no crash ----------------------------------------
+{
+  el('<div data-ae="l-noTpl"></div>');
+  await tick();
+  const origError = console.error;
+  let warned = false;
+  console.error = (...args) => { if (String(args[0]).includes('no <template>')) warned = true; };
+  ae('l-noTpl').list(['x'], () => {});
+  console.error = origError;
+  assert(warned, 'missing <template> logs a console.error and no-ops');
+}
+
+// --- ae.parts(): named lookup of data-ae descendants ---------------------------
+{
+  const ul = el(`<ul data-ae="p-list"><template><li>
+    <b data-ae="p-title"></b><i data-ae="p-due"></i>
+  </li></template></ul>`);
+  await tick();
+  const items = ae.signal([{ id: 1, text: 'ship', due: 'fri' }]);
+  ae('p-list').list(items, (node, it) => {
+    const p = ae.parts(node);
+    p['p-title'].textContent = it.text;
+    p['p-due'].textContent = it.due;
+  }, (it) => it.id);
+  const li = ul.querySelector('li');
+  assert(li.querySelector('[data-ae="p-title"]').textContent === 'ship', 'parts lookup renders into named part');
+  assert(li.querySelector('[data-ae="p-due"]').textContent === 'fri', 'multiple parts resolve');
+  assert(ae.parts(li) === ae.parts(li), 'parts map is cached per root');
+  await tick();
+  assert(ae('p-title').els.length === 1, 'part elements still participate in global handles');
+}
+
+// --- ae.parts(): first match wins on duplicates, root excluded ------------------
+{
+  const root = el(`<div data-ae="p-root"><span data-ae="p-dup">first</span><span data-ae="p-dup">second</span></div>`);
+  await tick();
+  const p = ae.parts(root);
+  assert(p['p-dup'].textContent === 'first', 'duplicate part names: first match wins');
+  assert(p['p-root'] === undefined, 'the root itself is not one of its parts');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

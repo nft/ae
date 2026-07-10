@@ -58,6 +58,13 @@ actually changed** (`Object.is`) — unchanged results cause no re-renders.
 const total = ae.computed(() => price.value * qty.value);
 ```
 
+### `ae.parts(root) → { name: element }`
+Named lookup of `data-ae` **descendants** of `root` (the root itself is not a
+part). First match wins on duplicate names. Cached per root — intended for
+template-stamped nodes, whose structure is static; don't use it on subtrees
+you restructure. Part elements still participate in global handles
+(`ae('title')` binds them all; `parts` is just scoped access).
+
 ### `ae.isSignal(v) → boolean`
 True for `Signal` and `Computed` instances. The imperative helpers use this to
 decide between one-shot and reactive application.
@@ -115,6 +122,32 @@ Apply to every element in the handle. Sugar — everything is also doable inside
 | `.attr(name, v)` | set attribute; `null`/`undefined`/`false` removes it, `true` sets it empty |
 | `.show(on)` | toggle `hidden` |
 
+### Lists
+
+```html
+<ul data-ae="todos">
+  <template><li><b data-ae="title"></b> <i data-ae="due"></i></li></template>
+</ul>
+```
+
+```js
+ae('todos').list(todos, (el, todo, i) => {
+  const p = ae.parts(el);
+  p.title.textContent = `${i + 1}. ${todo.text}`;
+  p.due.textContent = todo.due;
+}, (todo) => todo.id);
+```
+
+| method | behavior |
+|---|---|
+| `.list(items, render, key?)` | Keyed list stamping. `items` is a `Reactive<T[]>` (signal/computed → reactive, function → auto-tracked, plain array → stamped once). The container's `<template>` (exactly one root element) is the item prototype; stamped nodes are kept at the end of the container in item order. `render(el, item, index)` runs per node in its own effect — re-runs when the item is replaced by key, the index moves, or any signal read inside changes. `key` defaults to item identity; duplicate keys log an error and fall back to a fresh node. |
+
+Reconciliation guarantees: reused keys keep their DOM node (unchanged items —
+same reference, same index — don't re-render); reordering moves nodes without
+remounting `data-ae` bindings inside them; vanished keys remove the node and
+dispose its effect; container unmount disposes everything. `data-ae` elements
+inside the template participate in the global lifecycle as usual.
+
 ### Escape hatches
 
 | member | behavior |
@@ -147,6 +180,6 @@ Apply to every element in the handle. Sugar — everything is also doable inside
 - **Runaway guard**: an effect that writes a signal it also reads trips a
   circuit breaker after 100 flush cycles (with a `console.error`) instead of
   hanging the tab.
-- **No templating**: for repeated DOM, clone a native `<template>` inside
-  `mount`/`render`. A `.list()` helper is deliberately deferred to v2 until
-  real usage demands it.
+- **Templating stays native**: `.list()` stamps from a real `<template>`
+  element — no template syntax, no virtual DOM; reconciliation is keyed
+  node reuse.
