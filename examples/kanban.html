@@ -147,8 +147,7 @@
       el.textContent = `${done}/${cards.value.length} done`;
     });
 
-    // --- shared card actions (id read from the DOM key stamp) --------------
-    const idOf = (btn) => Number(btn.closest('[data-key]').dataset.key);
+    // --- shared card actions (card recovered from the DOM via ae.itemOf) ----
     const move = (id, dir) => {
       cards.value = cards.value.map((c) => {
         if (c.id !== id) return c;
@@ -166,16 +165,15 @@
 
       ae('cards', colEl).list(colCards, (card, c) => {
         ae.parts(card)['card-title'].textContent = c.title;
-        card.dataset.key = c.id;
       }, (c) => c.id);
 
       ae('col-count', colEl).text(() => colCards.value.length);
       ae('col-empty', colEl).show(() => colCards.value.length === 0);
 
-      ae('card-left', colEl).press((btn) => move(idOf(btn), -1));
-      ae('card-right', colEl).press((btn) => move(idOf(btn), +1));
+      ae('card-left', colEl).press((btn) => move(ae.itemOf(btn).id, -1));
+      ae('card-right', colEl).press((btn) => move(ae.itemOf(btn).id, +1));
       ae('card-del', colEl).press((btn) => {
-        const id = idOf(btn);
+        const { id } = ae.itemOf(btn);
         cards.value = cards.value.filter((c) => c.id !== id);
       });
 

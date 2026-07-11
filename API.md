@@ -44,19 +44,17 @@ gets bindings from `ae('x')` *and* `ae('x', root)`. Nested scopes stack the
 same way (innermost first). Scoped handles are cached per `(root, name)`.
 
 The intended use is per-list behavior without global name collisions — scope
-to the container, stamp a key in `render`, resolve the item in the handler:
+to the container, recover the item in the handler with `ae.itemOf`:
 
 ```js
-ae('todos')
-  .list(todos, (li, todo) => {
-    ae.parts(li).title.textContent = todo.text;
-    li.dataset.key = todo.id;
-  }, (todo) => todo.id);
+ae('todos').list(todos, (li, todo) => {
+  ae.parts(li).title.textContent = todo.text;
+}, (todo) => todo.id);
 
 const container = ae('todos').els[0];
 ae('remove', container).press((btn) => {
-  const key = btn.closest('[data-key]').dataset.key;
-  todos.value = todos.value.filter((t) => String(t.id) !== key);
+  const todo = ae.itemOf(btn);
+  todos.value = todos.value.filter((t) => t.id !== todo.id);
 });
 ```
 
@@ -114,6 +112,21 @@ part). First match wins on duplicate names. Cached per root — intended for
 template-stamped nodes, whose structure is static; don't use it on subtrees
 you restructure. Part elements still participate in global handles
 (`ae('title')` binds them all; `parts` is just scoped access).
+
+### `ae.itemOf(el) → item | undefined`
+The current `.list` item for the stamped node containing `el` — walks up to
+the **nearest** stamped node, so nested lists resolve to the innermost.
+Returns `undefined` outside any stamped node, or once the item has been
+removed. The read is tracked: calling it inside an effect/render re-runs
+when the item is replaced by key. This is how event handlers recover "which
+item was clicked" without stamping keys into the DOM:
+
+```js
+ae('remove', container).press((btn) => {
+  const todo = ae.itemOf(btn);
+  todos.value = todos.value.filter((t) => t.id !== todo.id);
+});
+```
 
 ### `ae.isSignal(v) → boolean`
 True for `Signal` and `Computed` instances. The imperative helpers use this to

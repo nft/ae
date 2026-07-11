@@ -904,5 +904,52 @@ const fireInput = (node) => node.dispatchEvent(new dom.window.Event('input', { b
   assert(ae('sc-keep', keeper) === keepHandle, 'map created outside the scope is not retired by it');
 }
 
+// ===========================================================================
+// ae.itemOf(): list item recovery
+// ===========================================================================
+
+// --- resolution, currency, tracking, removal ----------------------------------------
+{
+  const root = el(`<ul data-ae="io-list"><template><li><button data-ae="io-btn"></button></li></template></ul>`);
+  await tick();
+  const items = ae.signal([{ id: 1, t: 'a' }, { id: 2, t: 'b' }]);
+  ae('io-list').list(items, (li, it) => {
+    ae.parts(li)['io-btn'].textContent = it.t;
+  }, (it) => it.id);
+  const lis = () => [...root.querySelectorAll('li')];
+  assert(ae.itemOf(lis()[0].querySelector('button')).t === 'a', 'itemOf resolves from a descendant of the stamped node');
+  assert(ae.itemOf(lis()[1]).t === 'b', 'itemOf resolves from the stamped node itself');
+  assert(ae.itemOf(root) === undefined, 'itemOf on the container (outside any stamped node) is undefined');
+
+  items.value = [{ id: 1, t: 'a2' }, { id: 2, t: 'b' }];
+  await tick();
+  assert(ae.itemOf(lis()[0]).t === 'a2', 'itemOf returns the CURRENT item after replacement by key');
+
+  const seen = [];
+  const disposeEff = effect(() => { seen.push(ae.itemOf(lis()[0]).t); });
+  items.value = [{ id: 1, t: 'a3' }, { id: 2, t: 'b' }];
+  await tick();
+  assert(seen.join(',') === 'a2,a3', 'itemOf tracks inside an effect (re-runs on replacement)');
+  disposeEff();
+
+  const firstNode = lis()[0];
+  items.value = [{ id: 2, t: 'b' }];
+  await tick();
+  assert(ae.itemOf(firstNode) === undefined, 'itemOf is undefined once the item is removed');
+}
+
+// --- nested lists: nearest stamped node wins ----------------------------------------
+{
+  const root = el(`<div data-ae="io-outer"><template><section><ul data-ae="io-inner"><template><li></li></template></ul></section></template></div>`);
+  await tick();
+  ae('io-inner').list(ae.signal(['x', 'y']), () => {});
+  ae('io-outer').list(ae.signal(['A']), () => {});
+  await tick();
+  const leaf = root.querySelector('li');
+  const section = root.querySelector('section');
+  assert(ae.itemOf(leaf) === 'x', 'nested: innermost list item wins');
+  assert(ae.itemOf(section) === 'A', 'nested: outer stamped node yields the outer item');
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -4,7 +4,7 @@ Tiny attribute-based behavior + reactivity library. **HTML is the source of
 truth** — you write real markup, `ae` attaches behavior to it. No virtual DOM,
 no hydration, no template syntax, no build step required.
 
-**2.9 KB** min+gzip · zero dependencies · TypeScript · one `data-ae` attribute
+**3 KB** min+gzip · zero dependencies · TypeScript · one `data-ae` attribute
 
 ```html
 <button data-ae="save">Save</button>
@@ -58,6 +58,11 @@ unchanged items don't re-render, removed items are disposed.
 ae('todos').list(todos, (li, todo, i) => {
   ae.parts(li).title.textContent = `${i + 1}. ${todo.text}`;
 }, todo => todo.id);
+
+ae('remove').press(btn => {                 // which item was clicked?
+  const todo = ae.itemOf(btn);              // ae knows — no key stamping
+  todos.value = todos.value.filter(t => t.id !== todo.id);
+});
 ```
 
 **Two-way forms** — `.input(signal)` wires by field type: strings for

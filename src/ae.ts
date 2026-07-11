@@ -598,6 +598,7 @@ export class Handle {
 
       const removeRec = (rec: Rec) => {
         rec.dispose();
+        listRecords.delete(rec.node);
         rec.node.remove();
       };
 
@@ -633,6 +634,7 @@ export class Handle {
             const indexSig = new Signal(i);
             const dispose = effect(() => render(node, itemSig.value, indexSig.value));
             rec = { node, item: itemSig, index: indexSig, dispose };
+            listRecords.set(node, rec as ListRecord);
           }
           next.set(k, rec);
           order.push(rec);
@@ -676,6 +678,28 @@ let anyScoped = false;
 // While a .scope() callback runs, roots whose handle maps are first created
 // get collected here, to be retired when that scope's root unmounts.
 let scopeCreated: Set<HTMLElement> | null = null;
+
+// Stamped list node → its live record, for ae.itemOf recovery.
+interface ListRecord {
+  item: Signal<unknown>;
+  index: Signal<number>;
+}
+const listRecords = new WeakMap<HTMLElement, ListRecord>();
+
+/**
+ * The current item of the .list-stamped node containing el — walks up to the
+ * nearest stamped node, so nested lists resolve to the innermost. Returns
+ * undefined outside any stamped node (or after the item was removed).
+ * Reading it inside an effect/render tracks the item: replacement by key
+ * re-runs the effect.
+ */
+export function itemOf<T = unknown>(el: HTMLElement): T | undefined {
+  for (let n: HTMLElement | null = el; n; n = n.parentElement) {
+    const rec = listRecords.get(n);
+    if (rec) return rec.item.value as T;
+  }
+  return undefined;
+}
 
 const partsCache = new WeakMap<HTMLElement, Record<string, HTMLElement>>();
 
@@ -794,5 +818,6 @@ export const ae = Object.assign(
     effect,
     isSignal,
     parts,
+    itemOf,
   },
 );
