@@ -36,6 +36,41 @@ appear on any number of elements.
 Returns a **live handle** for all elements with `data-ae="name"` — current ones
 and any added to the DOM later. Handles are cached: `ae('x') === ae('x')`.
 
+### `ae(name, root) → Handle` (scoped)
+Same live handle, but matching, mounting, and `.els` only consider
+**descendants** of `root` (the root itself is not a match, mirroring
+`ae.parts`). Global and scoped handles compose: an element inside `root`
+gets bindings from `ae('x')` *and* `ae('x', root)`. Nested scopes stack the
+same way (innermost first). Scoped handles are cached per `(root, name)`.
+
+The intended use is per-list behavior without global name collisions — scope
+to the container, stamp a key in `render`, resolve the item in the handler:
+
+```js
+ae('todos')
+  .list(todos, (li, todo) => {
+    ae.parts(li).title.textContent = todo.text;
+    li.dataset.key = todo.id;
+  }, (todo) => todo.id);
+
+const container = ae('todos').els[0];
+ae('remove', container).press((btn) => {
+  const key = btn.closest('[data-key]').dataset.key;
+  todos.value = todos.value.filter((t) => String(t.id) !== key);
+});
+```
+
+Two caveats, both consequences of handles being cached and append-only:
+
+- **Set a scoped handle up once per root.** Re-running the same setup for the
+  same root (e.g. inside a `.mount` callback of a root that is removed and
+  re-added, or inside a `.list` render, which re-runs) stacks duplicate
+  bindings on the cached handle.
+- **Moving an element out of the scope does not unbind it.** Net-state
+  lifecycle means moves never remount; a bound element reparented outside
+  `root` keeps its scoped bindings until it actually leaves the DOM (or is
+  renamed). Remove-and-reinsert if you need a rebind.
+
 ### `ae.signal(initial) → Signal`
 Reactive value.
 

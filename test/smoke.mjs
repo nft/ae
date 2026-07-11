@@ -685,5 +685,134 @@ const fireInput = (node) => node.dispatchEvent(new dom.window.Event('input', { b
   assert(s.value === 'b', 'removed field no longer writes to the signal');
 }
 
+// ===========================================================================
+// scoped roots: ae(name, root)
+// ===========================================================================
+
+// --- caching: per (root, name), distinct from global -----------------------------
+{
+  const r1 = el('<div></div>');
+  const r2 = el('<div></div>');
+  assert(ae('s-cache', r1) === ae('s-cache', r1), 'scoped handles are cached per (root, name)');
+  assert(ae('s-cache', r1) !== ae('s-cache', r2), 'different roots get different handles');
+  assert(ae('s-cache', r1) !== ae('s-cache'), 'scoped and global handles are distinct');
+}
+
+// --- scoping: bindings reach descendants of root and nothing else -----------------
+{
+  const a = el('<div><span data-ae="s-item">a</span></div>');
+  const b = el('<div><span data-ae="s-item">b</span></div>');
+  await tick();
+  ae('s-item', a).render((n) => { n.dataset.scoped = 'yes'; });
+  assert(a.querySelector('span').dataset.scoped === 'yes', 'scoped binding reaches descendants of root');
+  assert(b.querySelector('span').dataset.scoped === undefined, 'scoped binding does not leak outside root');
+}
+
+// --- the root itself is not a match (mirrors ae.parts) -----------------------------
+{
+  const root = el('<div data-ae="s-self"><span data-ae="s-self"></span></div>');
+  await tick();
+  const h = ae('s-self', root);
+  assert(h.els.length === 1 && h.els[0].tagName === 'SPAN', 'scoped .els excludes the root itself');
+  let mounts = 0;
+  h.mount(() => { mounts++; });
+  assert(mounts === 1, 'scoped mount skips the root element even when its name matches');
+}
+
+// --- late elements: mounted under root, ignored outside ---------------------------
+{
+  const root = el('<div></div>');
+  const outside = el('<div></div>');
+  let mounts = 0;
+  ae('s-late', root).mount(() => { mounts++; });
+  root.insertAdjacentHTML('beforeend', '<i data-ae="s-late"></i>');
+  outside.insertAdjacentHTML('beforeend', '<i data-ae="s-late"></i>');
+  await tick();
+  assert(mounts === 1, 'late element under root mounts; same name outside root does not');
+}
+
+// --- global + scoped compose on the same element -----------------------------------
+{
+  const root = el('<div><em data-ae="s-both"></em></div>');
+  await tick();
+  let global = 0, scoped = 0;
+  ae('s-both').mount(() => { global++; });
+  ae('s-both', root).mount(() => { scoped++; });
+  assert(global === 1 && scoped === 1, 'global and scoped bindings compose on the same element');
+}
+
+// --- nested scopes: inner elements get both, outer-only elements just the outer ----
+{
+  const outer = el('<div><section><u data-ae="s-nest"></u></section><u data-ae="s-nest"></u></div>');
+  const inner = outer.querySelector('section');
+  await tick();
+  const seenOuter = [], seenInner = [];
+  ae('s-nest', outer).mount((n) => { seenOuter.push(n); });
+  ae('s-nest', inner).mount((n) => { seenInner.push(n); });
+  assert(seenOuter.length === 2, 'outer scope sees elements in nested scopes too');
+  assert(seenInner.length === 1 && seenInner[0].parentElement === inner, 'inner scope sees only its own subtree');
+}
+
+// --- lifecycle: cleanup on removal, re-attach on re-add ----------------------------
+{
+  const root = el('<div><b data-ae="s-cycle"></b></div>');
+  const node = root.querySelector('b');
+  await tick();
+  let mounts = 0, cleanups = 0;
+  ae('s-cycle', root).mount(() => { mounts++; return () => cleanups++; });
+  assert(mounts === 1, 'scoped mount ran for the existing element');
+  node.remove();
+  await tick();
+  assert(cleanups === 1, 'scoped cleanup runs when the element is removed');
+  root.append(node);
+  await tick();
+  assert(mounts === 2, 're-added element re-attaches scoped bindings');
+}
+
+// --- renaming an element inside the scope binds the scoped name --------------------
+{
+  const root = el('<div><i data-ae="s-before"></i></div>');
+  const node = root.querySelector('i');
+  await tick();
+  let mounts = 0;
+  ae('s-after', root).mount(() => { mounts++; });
+  node.dataset.ae = 's-after';
+  await tick();
+  assert(mounts === 1, 'rename inside the scope attaches scoped bindings');
+}
+
+// --- the list idiom: container-scoped press, key stamped in render ------------------
+{
+  const root = el(`<ul data-ae="s-todos"><template><li><span data-ae="s-title"></span><button data-ae="s-del"></button></li></template></ul>`);
+  const decoy = el('<div><button data-ae="s-del"></button></div>');
+  await tick();
+  const todos = ae.signal([
+    { id: 1, t: 'one' },
+    { id: 2, t: 'two' },
+    { id: 3, t: 'three' },
+  ]);
+  ae('s-todos').list(todos, (li, todo) => {
+    ae.parts(li)['s-title'].textContent = todo.t;
+    li.dataset.key = todo.id;
+  }, (todo) => todo.id);
+  let presses = 0;
+  ae('s-del', root).press((btn) => {
+    presses++;
+    const key = btn.closest('[data-key]').dataset.key;
+    todos.value = todos.value.filter((t) => String(t.id) !== key);
+  });
+  await tick();
+  assert(root.querySelectorAll('li').length === 3, 'list stamped 3 items');
+  root.querySelectorAll('li')[1].querySelector('button')
+    .dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await tick();
+  const titles = [...root.querySelectorAll('li')].map((li) => li.firstElementChild.textContent);
+  assert(titles.join(',') === 'one,three', 'container-scoped press removes exactly the right item');
+  decoy.querySelector('button')
+    .dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await tick();
+  assert(presses === 1, 'same-name button outside the container never fires the scoped handler');
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -264,8 +264,15 @@ function mountElement(el: HTMLElement): void {
   if (meta.name !== undefined && meta.name !== name) unmountElement(el);
   meta.name = name;
   const handle = handles.get(name);
-  if (!handle) return;
-  for (const binding of handle._bindings) attach(el, binding);
+  if (handle) for (const binding of handle._bindings) attach(el, binding);
+  if (anyScoped) {
+    // Scoped handles: every ancestor that is a scope root for this name
+    // contributes its bindings (innermost first).
+    for (let anc = el.parentElement; anc; anc = anc.parentElement) {
+      const scoped = scopedHandles.get(anc)?.get(name);
+      if (scoped) for (const binding of scoped._bindings) attach(el, binding);
+    }
+  }
 }
 
 function unmountElement(el: HTMLElement): void {
@@ -317,16 +324,23 @@ export type PressEvent = MouseEvent | KeyboardEvent;
  * Live handle for all elements carrying data-ae="name" — current ones and any
  * connected later (one shared MutationObserver). All methods chain.
  * Callbacks always receive the matching element first: fn(el, ...).
+ *
+ * A handle with a `root` is scoped: it only ever matches *descendants* of
+ * root (the root itself is not a match, mirroring ae.parts).
  */
 export class Handle {
   /** @internal */
   readonly _bindings: Binding[] = [];
 
-  constructor(readonly name: string) {}
+  constructor(
+    readonly name: string,
+    readonly root?: HTMLElement,
+  ) {}
 
-  /** Plain array of currently matching elements. */
+  /** Plain array of currently matching elements (under root, if scoped). */
   get els(): HTMLElement[] {
-    return Array.from(document.querySelectorAll<HTMLElement>(selectorFor(this.name)));
+    const scope = this.root ?? document;
+    return Array.from(scope.querySelectorAll<HTMLElement>(selectorFor(this.name)));
   }
 
   /** Run fn over current elements once. Not reactive, not for future ones. */
@@ -626,6 +640,12 @@ export class Handle {
 
 const handles = new Map<string, Handle>();
 
+// Scoped handles, per root element. WeakMap: a scope root that leaves the DOM
+// for good takes its handles with it. `anyScoped` keeps the ancestor walk in
+// mountElement free until the feature is actually used.
+const scopedHandles = new WeakMap<HTMLElement, Map<string, Handle>>();
+let anyScoped = false;
+
 const partsCache = new WeakMap<HTMLElement, Record<string, HTMLElement>>();
 
 /**
@@ -705,10 +725,30 @@ if (typeof document !== 'undefined') {
 
 /**
  * ae('name') → cached live Handle for [data-ae="name"].
+ * ae('name', root) → cached live Handle scoped to descendants of root.
  * ae.signal / ae.computed / ae.effect / ae.isSignal — reactivity primitives.
+ *
+ * Handles are cached per (name) and per (root, name); binding methods
+ * append. Set a scoped handle up once per root — re-running the same setup
+ * (e.g. in a mount callback of a root that gets removed and re-added) stacks
+ * duplicate bindings.
  */
 export const ae = Object.assign(
-  (name: string): Handle => {
+  (name: string, root?: HTMLElement): Handle => {
+    if (root !== undefined) {
+      anyScoped = true;
+      let map = scopedHandles.get(root);
+      if (!map) {
+        map = new Map();
+        scopedHandles.set(root, map);
+      }
+      let handle = map.get(name);
+      if (!handle) {
+        handle = new Handle(name, root);
+        map.set(name, handle);
+      }
+      return handle;
+    }
     let handle = handles.get(name);
     if (!handle) {
       handle = new Handle(name);
