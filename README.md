@@ -76,7 +76,8 @@ Full API and semantics: **[API.md](API.md)**. Live playground: `bun run serve` â
 
 Real app: **[examples/kanban.html](examples/kanban.html)** â€” a kanban with
 drag & drop, dynamic columns, inline editing, undo, filtering, and
-localStorage persistence in ~170 lines of JS.
+localStorage persistence in ~170 lines of JS. One-pager with live demos:
+**[site.html](site.html)**.
 
 ## Performance
 

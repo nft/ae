@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ae — the HTML you wrote is the app</title>
+  <meta name="description" content="ae is a 3 KB attribute-based reactivity library. One data-ae attribute, signals, keyed lists, two-way forms. No virtual DOM, no hydration, no build step.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cream: '#faf7f2',
+            ink: '#2b2622',
+          },
+          fontFamily: {
+            display: ['Fraunces', 'Georgia', 'serif'],
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .demo-btn { @apply rounded-lg border border-stone-300 bg-white px-3.5 py-1.5 text-sm font-medium text-stone-700 transition hover:border-amber-600 hover:text-amber-800 active:translate-y-px; }
+      .demo-field { @apply rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-800 outline-none transition focus:border-amber-600 focus:ring-2 focus:ring-amber-600/15; }
+    }
+  </style>
+</head>
+<body class="bg-cream font-sans text-ink antialiased">
+
+  <!-- ===== nav ===== -->
+  <nav class="sticky top-0 z-10 border-b border-stone-200/70 bg-cream/85 backdrop-blur">
+    <div class="mx-auto flex max-w-5xl items-center gap-6 px-6 py-3.5">
+      <a href="#" class="font-display text-2xl font-semibold tracking-tight">ae</a>
+      <span class="rounded-full border border-amber-700/25 bg-amber-700/5 px-2.5 py-0.5 font-mono text-[11px] text-amber-800">3 KB · zero deps</span>
+      <div class="ml-auto hidden items-center gap-6 text-sm text-stone-500 sm:flex">
+        <a href="#cases" class="transition hover:text-ink">Cases</a>
+        <a href="#docs" class="transition hover:text-ink">Docs</a>
+        <a href="#guarantees" class="transition hover:text-ink">Guarantees</a>
+        <a href="examples/kanban.html" class="transition hover:text-ink">Kanban</a>
+        <a href="API.md" class="rounded-lg border border-stone-300 px-3 py-1.5 font-medium text-stone-700 transition hover:border-amber-700 hover:text-amber-800">API.md</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== hero ===== -->
+  <header class="mx-auto grid max-w-5xl items-center gap-12 px-6 pb-20 pt-16 md:grid-cols-2 md:pt-24">
+    <div>
+      <h1 class="font-display text-5xl font-medium leading-[1.08] tracking-tight md:text-6xl">
+        The HTML you wrote<br>
+        <em class="text-amber-800">is</em> the app.
+      </h1>
+      <p class="mt-6 max-w-md text-lg leading-relaxed text-stone-600">
+        <strong class="font-semibold text-ink">ae</strong> attaches behavior to real markup through one
+        <code class="rounded bg-stone-200/70 px-1.5 py-0.5 font-mono text-[15px] text-stone-800">data-ae</code>
+        attribute. Signals, keyed lists, two-way forms — no virtual DOM, no hydration, no build step.
+      </p>
+      <div class="mt-8 flex flex-wrap items-center gap-3">
+        <a href="#cases" class="rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-cream transition hover:bg-amber-900">See it work</a>
+        <a href="index.html" class="rounded-xl border border-stone-300 px-5 py-2.5 text-sm font-semibold text-stone-700 transition hover:border-amber-700 hover:text-amber-800">Open the playground</a>
+      </div>
+      <p class="mt-6 font-mono text-xs text-stone-400">Every demo on this page is live — the page itself runs on ae.</p>
+    </div>
+
+    <div class="rounded-2xl border border-stone-200 bg-white shadow-[0_20px_50px_-30px_rgba(120,72,20,0.35)]">
+      <pre class="overflow-x-auto rounded-t-2xl bg-stone-900 p-5 text-[13px] leading-relaxed text-stone-200"><code class="hl">&lt;button data-ae="save"&gt;Save&lt;/button&gt;
+&lt;span data-ae="status"&gt;&lt;/span&gt;
+
+const saves = ae.signal(0);
+
+ae('status').text(() => saves.value
+  ? `saved ${saves.value}×`
+  : 'never saved');
+
+ae('save').press(() => saves.value++);</code></pre>
+      <div class="flex items-center gap-4 rounded-b-2xl px-5 py-4">
+        <span class="font-mono text-[10px] uppercase tracking-widest text-amber-700">live</span>
+        <button data-ae="hero-save" class="demo-btn">Save</button>
+        <span data-ae="hero-status" class="text-sm text-stone-500"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== principles ===== -->
+  <section class="border-y border-stone-200/70 bg-white/50">
+    <div class="mx-auto grid max-w-5xl gap-10 px-6 py-14 md:grid-cols-3">
+      <div>
+        <h3 class="font-display text-xl font-medium">HTML first</h3>
+        <p class="mt-2 text-sm leading-relaxed text-stone-600">Markup is the source of truth. You write real elements and real <code class="font-mono text-[13px]">&lt;template&gt;</code> tags; ae binds behavior to them. View source and it's all there.</p>
+      </div>
+      <div>
+        <h3 class="font-display text-xl font-medium">Handles are live</h3>
+        <p class="mt-2 text-sm leading-relaxed text-stone-600">One shared <code class="font-mono text-[13px]">MutationObserver</code> powers everything: elements added later bind automatically, removed ones clean up completely. No manual unbinding, no leaks.</p>
+      </div>
+      <div>
+        <h3 class="font-display text-xl font-medium">Small on purpose</h3>
+        <p class="mt-2 text-sm leading-relaxed text-stone-600">~3 KB min+gzip, zero dependencies, written in TypeScript. The whole API fits on a card — and it's further down this page.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== showcases ===== -->
+  <main id="cases" class="mx-auto max-w-5xl space-y-24 px-6 py-24">
+
+    <!-- case 1: signals & batching -->
+    <section class="grid items-start gap-10 md:grid-cols-2">
+      <div>
+        <span class="font-mono text-[11px] uppercase tracking-widest text-amber-700">ae.signal · ae.computed · .render</span>
+        <h2 class="mt-3 font-display text-3xl font-medium tracking-tight">Three writes, one render</h2>
+        <p class="mt-4 leading-relaxed text-stone-600">
+          Signal writes coalesce per microtask, and computeds only notify when their value actually
+          changes. Press <em>+3</em>: the count jumps by three, the render counter ticks by
+          <strong class="text-ink">one</strong>.
+        </p>
+        <pre class="mt-6 overflow-x-auto rounded-xl bg-stone-900 p-5 text-[13px] leading-relaxed text-stone-200"><code class="hl">const count = ae.signal(0);
+const double = ae.computed(() => count.value * 2);
+
+ae('count').text(count);
+ae('double').text(double);
+
+ae('plus3').press(() => {
+  count.value++;   // three writes …
+  count.value++;
+  count.value++;   // … flush once, next microtask
+});</code></pre>
+      </div>
+      <div class="rounded-2xl border border-stone-200 bg-white p-6 md:mt-14">
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div class="rounded-xl bg-stone-100/80 py-4">
+            <div class="font-mono text-[10px] uppercase tracking-widest text-stone-400">count</div>
+            <div data-ae="d1-count" class="mt-1 font-display text-3xl font-medium"></div>
+          </div>
+          <div class="rounded-xl bg-stone-100/80 py-4">
+            <div class="font-mono text-[10px] uppercase tracking-widest text-stone-400">double</div>
+            <div data-ae="d1-double" class="mt-1 font-display text-3xl font-medium text-amber-800"></div>
+          </div>
+          <div class="rounded-xl bg-stone-100/80 py-4">
+            <div class="font-mono text-[10px] uppercase tracking-widest text-stone-400">renders</div>
+            <div data-ae="d1-renders" class="mt-1 font-display text-3xl font-medium text-stone-400"></div>
+          </div>
+        </div>
+        <div class="mt-4 flex gap-2">
+          <button data-ae="d1-inc" class="demo-btn">+1</button>
+          <button data-ae="d1-batch" class="demo-btn">+3 in one tick</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- case 2: keyed lists -->
+    <section class="grid items-start gap-10 md:grid-cols-2">
+      <div class="md:order-2">
+        <span class="font-mono text-[11px] uppercase tracking-widest text-amber-700">.list · ae.parts · ae.itemOf</span>
+        <h2 class="mt-3 font-display text-3xl font-medium tracking-tight">Keyed lists, native templates</h2>
+        <p class="mt-4 leading-relaxed text-stone-600">
+          <code class="font-mono text-[15px]">.list()</code> stamps the container's
+          <code class="font-mono text-[15px]">&lt;template&gt;</code> per item with keyed reconciliation.
+          Shuffle <em>moves</em> nodes — the mount times survive, proving nothing remounts. And handlers
+          recover their item with <code class="font-mono text-[15px]">ae.itemOf</code>: no keys stamped
+          into the DOM.
+        </p>
+        <pre class="mt-6 overflow-x-auto rounded-xl bg-stone-900 p-5 text-[13px] leading-relaxed text-stone-200"><code class="hl">ae('todos').list(todos, (li, todo, i) => {
+  const p = ae.parts(li);
+  p.title.textContent = `${i + 1}. ${todo.text}`;
+}, (todo) => todo.id);
+
+ae('remove').press((btn) => {
+  const todo = ae.itemOf(btn);   // which one?
+  todos.value = todos.value.filter((t) => t !== todo);
+});</code></pre>
+      </div>
+      <div class="rounded-2xl border border-stone-200 bg-white p-6 md:order-1 md:mt-14">
+        <div class="flex gap-2">
+          <input data-ae="d2-draft" placeholder="New item…" class="demo-field min-w-0 flex-1">
+          <button data-ae="d2-add" class="demo-btn">Add</button>
+          <button data-ae="d2-shuffle" class="demo-btn">Shuffle</button>
+        </div>
+        <div data-ae="d2-list" class="mt-4 space-y-2">
+          <p data-ae="d2-empty" class="rounded-xl border border-dashed border-stone-300 py-6 text-center text-sm text-stone-400">Nothing left — add one above.</p>
+          <template>
+            <div class="flex items-center gap-3 rounded-xl bg-stone-100/80 px-4 py-2.5">
+              <span data-ae="d2-title" class="flex-1 text-sm font-medium"></span>
+              <span data-ae="d2-when" class="font-mono text-[11px] text-amber-700"></span>
+              <button data-ae="d2-remove" class="text-sm text-stone-400 transition hover:text-red-600">✕</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- case 3: two-way forms -->
+    <section class="grid items-start gap-10 md:grid-cols-2">
+      <div>
+        <span class="font-mono text-[11px] uppercase tracking-widest text-amber-700">.input</span>
+        <h2 class="mt-3 font-display text-3xl font-medium tracking-tight">Forms that stay in type</h2>
+        <p class="mt-4 leading-relaxed text-stone-600">
+          <code class="font-mono text-[15px]">.input(signal)</code> wires by field type — strings for
+          text, booleans for checkboxes, <strong class="text-ink">real numbers</strong> for range and
+          number inputs. The two volume fields below share one signal; writes are equality-guarded, so
+          echoes never move your caret.
+        </p>
+        <pre class="mt-6 overflow-x-auto rounded-xl bg-stone-900 p-5 text-[13px] leading-relaxed text-stone-200"><code class="hl">const name = ae.signal('');
+const volume = ae.signal(40);   // Signal&lt;number&gt;
+const loud = ae.signal(false);  // Signal&lt;boolean&gt;
+
+ae('name').input(name);
+ae('volume').input(volume);     // range + number
+ae('loud').input(loud);</code></pre>
+      </div>
+      <div class="rounded-2xl border border-stone-200 bg-white p-6 md:mt-14">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="text-xs font-medium text-stone-500">Name
+            <input data-ae="d3-name" placeholder="Your name" class="demo-field mt-1.5 w-full">
+          </label>
+          <label class="text-xs font-medium text-stone-500">Volume (number)
+            <input data-ae="d3-vol" type="number" min="0" max="100" class="demo-field mt-1.5 w-full">
+          </label>
+          <label class="text-xs font-medium text-stone-500 sm:col-span-2">Volume (range — same signal)
+            <input data-ae="d3-vol" type="range" min="0" max="100" class="mt-2 w-full accent-amber-700">
+          </label>
+          <label class="flex items-center gap-2 text-sm text-stone-600 sm:col-span-2">
+            <input data-ae="d3-loud" type="checkbox" class="h-4 w-4 accent-amber-700"> Extra loud
+          </label>
+        </div>
+        <p data-ae="d3-preview" class="mt-5 rounded-xl bg-amber-700/5 px-4 py-3 text-center font-display text-lg text-amber-900"></p>
+      </div>
+    </section>
+
+    <!-- case 4: scoped widgets -->
+    <section class="grid items-start gap-10 md:grid-cols-2">
+      <div class="md:order-2">
+        <span class="font-mono text-[11px] uppercase tracking-widest text-amber-700">.scope · ae(name, root)</span>
+        <h2 class="mt-3 font-display text-3xl font-medium tracking-tight">Same names, private state</h2>
+        <p class="mt-4 leading-relaxed text-stone-600">
+          Every widget below uses identical inner names. One
+          <code class="font-mono text-[15px]">.scope()</code> call wires each stamped root with its own
+          scoped handles and its own private signal — current widgets and any you add. Remove one and
+          its scope tears down; the others don't even blink.
+        </p>
+        <pre class="mt-6 overflow-x-auto rounded-xl bg-stone-900 p-5 text-[13px] leading-relaxed text-stone-200"><code class="hl">ae('widget').scope((el) => {
+  const clicks = ae.signal(0);   // per widget
+
+  ae('count', el).text(clicks);
+  ae('inc', el).press(() => clicks.value++);
+});</code></pre>
+      </div>
+      <div class="rounded-2xl border border-stone-200 bg-white p-6 md:order-1 md:mt-14">
+        <button data-ae="d4-add" class="demo-btn">Add widget</button>
+        <div data-ae="d4-list" class="mt-4 space-y-2">
+          <p data-ae="d4-empty" class="rounded-xl border border-dashed border-stone-300 py-6 text-center text-sm text-stone-400">No widgets.</p>
+          <template>
+            <div data-ae="d4-widget" class="flex items-center gap-3 rounded-xl bg-stone-100/80 px-4 py-2.5">
+              <span data-ae="d4-name" class="flex-1 text-sm font-medium"></span>
+              <span class="font-mono text-sm text-amber-800">×<span data-ae="d4-count"></span></span>
+              <button data-ae="d4-inc" class="demo-btn !px-2.5 !py-1">+</button>
+              <button data-ae="d4-del" class="text-sm text-stone-400 transition hover:text-red-600">✕</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== docs ===== -->
+  <section id="docs" class="border-y border-stone-200/70 bg-white/50">
+    <div class="mx-auto max-w-5xl px-6 py-20">
+      <span class="font-mono text-[11px] uppercase tracking-widest text-amber-700">docs</span>
+      <h2 class="mt-3 font-display text-3xl font-medium tracking-tight">The whole API on one card</h2>
+      <p class="mt-3 max-w-xl text-stone-600">Full semantics, guarantees, and design history live in
+        <a href="API.md" class="font-medium text-amber-800 underline decoration-amber-700/30 underline-offset-4 hover:decoration-amber-700">API.md</a> —
+        this is everything there is.</p>
+
+      <div class="mt-10 grid gap-10 md:grid-cols-2">
+        <div>
+          <h3 class="font-mono text-xs uppercase tracking-widest text-stone-400">Global</h3>
+          <dl class="mt-4 space-y-3 text-sm">
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae(name)</dt><dd class="text-stone-600">live handle for every <code class="font-mono text-[12px]">data-ae="name"</code>, present or future</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae(name, root)</dt><dd class="text-stone-600">same, scoped to descendants of <code class="font-mono text-[12px]">root</code></dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.signal(v)</dt><dd class="text-stone-600">reactive value; writes batch per microtask</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.computed(fn)</dt><dd class="text-stone-600">lazy derived value; notifies only on real change</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.effect(fn)</dt><dd class="text-stone-600">auto-tracked side effect; returns dispose</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.parts(root)</dt><dd class="text-stone-600">named <code class="font-mono text-[12px]">data-ae</code> descendants of a stamped node</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.itemOf(el)</dt><dd class="text-stone-600">the current list item an element belongs to</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.isSignal(v)</dt><dd class="text-stone-600">true for signals and computeds</dd></div>
+          </dl>
+        </div>
+        <div>
+          <h3 class="font-mono text-xs uppercase tracking-widest text-stone-400">Handle — everything chains</h3>
+          <dl class="mt-4 space-y-3 text-sm">
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.render(fn)</dt><dd class="text-stone-600">auto-tracked render per element</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.mount(fn)</dt><dd class="text-stone-600">setup per element; return a cleanup</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.scope(fn)</dt><dd class="text-stone-600">per-root setup whose scoped handles retire on unmount</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.press / .hover / .on</dt><dd class="text-stone-600">semantic activation · pointer enter/leave · any event</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.text .cls .attr .show</dt><dd class="text-stone-600">sugar; take a value, a signal, or a function</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.input(signal)</dt><dd class="text-stone-600">two-way, typed by field kind</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.list(items, render, key)</dt><dd class="text-stone-600">keyed template stamping with node reuse</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.els / .each(fn)</dt><dd class="text-stone-600">escape hatches to the raw elements</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== guarantees ===== -->
+  <section id="guarantees" class="mx-auto max-w-5xl px-6 py-20">
+    <span class="font-mono text-[11px] uppercase tracking-widest text-amber-700">guarantees</span>
+    <h2 class="mt-3 font-display text-3xl font-medium tracking-tight">Semantics you can lean on</h2>
+    <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="rounded-2xl border border-stone-200 bg-white p-5">
+        <h3 class="font-medium">Batching</h3>
+        <p class="mt-1.5 text-sm leading-relaxed text-stone-600">Writes coalesce; each effect runs at most once per flush.</p>
+      </div>
+      <div class="rounded-2xl border border-stone-200 bg-white p-5">
+        <h3 class="font-medium">Absolute disposal</h3>
+        <p class="mt-1.5 text-sm leading-relaxed text-stone-600">A disposed effect never runs again — even if it was already queued.</p>
+      </div>
+      <div class="rounded-2xl border border-stone-200 bg-white p-5">
+        <h3 class="font-medium">Net-state lifecycle</h3>
+        <p class="mt-1.5 text-sm leading-relaxed text-stone-600">Moves don't remount; <code class="font-mono text-[12px]">a→b→a</code> renames are no-ops. Only net DOM change counts.</p>
+      </div>
+      <div class="rounded-2xl border border-stone-200 bg-white p-5">
+        <h3 class="font-medium">Fault isolation</h3>
+        <p class="mt-1.5 text-sm leading-relaxed text-stone-600">One throwing binding, cleanup, or effect never takes down the rest.</p>
+      </div>
+      <div class="rounded-2xl border border-stone-200 bg-white p-5">
+        <h3 class="font-medium">Runaway guard</h3>
+        <p class="mt-1.5 text-sm leading-relaxed text-stone-600">Self-triggering effects trip a circuit breaker instead of hanging the tab.</p>
+      </div>
+      <div class="rounded-2xl border border-amber-700/20 bg-amber-700/5 p-5">
+        <h3 class="font-medium text-amber-900">Measured, not promised</h3>
+        <p class="mt-1.5 text-sm leading-relaxed text-stone-600">10,000 keyed rows created in <strong>~257 ms</strong> end-to-end, cleared in ~50 ms. <a href="examples/bench.html" class="font-medium text-amber-800 underline decoration-amber-700/30 underline-offset-4 hover:decoration-amber-700">Run the bench →</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== footer ===== -->
+  <footer class="border-t border-stone-200/70">
+    <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-10 text-sm text-stone-500">
+      <span class="font-display text-lg font-semibold text-ink">ae</span>
+      <span>MIT license</span>
+      <span>TypeScript</span>
+      <span>~3 KB min+gzip</span>
+      <span class="ml-auto">This page runs on ae — view source.</span>
+    </div>
+  </footer>
+
+  <script type="module">
+    import { ae } from './dist/ae.js';
+
+    // --- tiny highlighter for the code samples ------------------------------
+    for (const el of document.querySelectorAll('code.hl')) {
+      const esc = el.textContent.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      el.innerHTML = esc.replace(
+        /(\/\/[^\n]*)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`)|\b(const|let|import|from|return|if|new|for|of)\b|\b(ae)\b(?=[.(])|(data-ae)/g,
+        (m, com, str, kw) =>
+          com ? `<span class="text-stone-500">${com}</span>`
+          : str ? `<span class="text-amber-200/90">${str}</span>`
+          : kw ? `<span class="text-orange-300">${kw}</span>`
+          : `<span class="text-amber-400">${m}</span>`);
+    }
+
+    // --- hero ----------------------------------------------------------------
+    const saves = ae.signal(0);
+    ae('hero-status').text(() => saves.value ? `saved ${saves.value}×` : 'never saved');
+    ae('hero-save').press(() => saves.value++);
+
+    // --- case 1: signals & batching -------------------------------------------
+    const count = ae.signal(0);
+    const double = ae.computed(() => count.value * 2);
+    let renders = 0;
+
+    ae('d1-count').render((el) => {
+      renders++;
+      el.textContent = count.value;
+      ae('d1-renders').each((r) => r.textContent = renders);
+    });
+    ae('d1-double').text(double);
+    ae('d1-inc').press(() => count.value++);
+    ae('d1-batch').press(() => { count.value++; count.value++; count.value++; });
+
+    // --- case 2: keyed lists ---------------------------------------------------
+    const todos = ae.signal([
+      { id: 1, text: 'Write real HTML' },
+      { id: 2, text: 'Add one attribute' },
+      { id: 3, text: 'Ship it' },
+    ]);
+    let todoSeq = todos.value.length;
+    const draft = ae.signal('');
+
+    const addTodo = () => {
+      const text = draft.value.trim();
+      if (!text) return;
+      todos.value = [...todos.value, { id: ++todoSeq, text }];
+      draft.value = '';
+    };
+    ae('d2-draft').input(draft).on('keydown', (el, e) => { if (e.key === 'Enter') addTodo(); });
+    ae('d2-add').press(addTodo);
+    ae('d2-shuffle').press(() => { todos.value = [...todos.value].sort(() => Math.random() - 0.5); });
+
+    ae('d2-list').list(todos, (li, todo, i) => {
+      ae.parts(li)['d2-title'].textContent = `${i + 1}. ${todo.text}`;
+    }, (todo) => todo.id);
+
+    ae('d2-empty').show(() => todos.value.length === 0);
+
+    ae('d2-list').scope((listEl) => {
+      ae('d2-when', listEl).mount((el) => {
+        const t = new Date();
+        el.textContent = `${t.toTimeString().slice(0, 8)}.${String(t.getMilliseconds()).padStart(3, '0')}`;
+      });
+      ae('d2-remove', listEl).press((btn) => {
+        const todo = ae.itemOf(btn);
+        todos.value = todos.value.filter((t) => t.id !== todo.id);
+      });
+    });
+
+    // --- case 3: two-way forms --------------------------------------------------
+    const fName = ae.signal('');
+    const fVolume = ae.signal(40);
+    const fLoud = ae.signal(false);
+
+    ae('d3-name').input(fName);
+    ae('d3-vol').input(fVolume);
+    ae('d3-loud').input(fLoud);
+
+    ae('d3-preview').text(() => {
+      const who = fName.value.trim() || 'Somebody';
+      const vol = Number.isNaN(fVolume.value) ? 0 : fVolume.value;
+      return `${who} is listening at volume ${vol}${fLoud.value ? ' 🔊' : ''}`;
+    });
+
+    // --- case 4: scoped widgets ---------------------------------------------------
+    const widgets = ae.signal([{ id: 1, name: 'Widget #1' }, { id: 2, name: 'Widget #2' }]);
+    let widgetSeq = widgets.value.length;
+
+    ae('d4-list').list(widgets, (el, w) => {
+      ae.parts(el)['d4-name'].textContent = w.name;
+    }, (w) => w.id);
+    ae('d4-empty').show(() => widgets.value.length === 0);
+    ae('d4-add').press(() => { widgets.value = [...widgets.value, { id: ++widgetSeq, name: `Widget #${widgetSeq}` }]; });
+
+    ae('d4-widget').scope((widgetEl) => {
+      const clicks = ae.signal(0);
+      ae('d4-count', widgetEl).text(clicks);
+      ae('d4-inc', widgetEl).press(() => clicks.value++);
+    });
+
+    ae('d4-del').press((btn) => {
+      const { id } = ae.itemOf(btn);
+      widgets.value = widgets.value.filter((w) => w.id !== id);
+    });
+  </script>
+</body>
+</html>
