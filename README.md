@@ -1,0 +1,93 @@
+# ae
+
+Tiny attribute-based behavior + reactivity library. **HTML is the source of
+truth** — you write real markup, `ae` attaches behavior to it. No virtual DOM,
+no hydration, no template syntax, no build step required.
+
+**2.9 KB** min+gzip · zero dependencies · TypeScript · one `data-ae` attribute
+
+```html
+<button data-ae="save">Save</button>
+<span data-ae="status"></span>
+```
+
+```js
+import { ae } from './dist/ae.js';
+
+const count = ae.signal(0);
+
+ae('status').render(el => el.textContent = `${count.value} items`);
+
+ae('save')
+  .press(() => count.value++)
+  .hover(el => el.classList.add('hot'), el => el.classList.remove('hot'));
+```
+
+Handles are **live**: elements added to the DOM later — by you, by `.list()`,
+by anything — get bound automatically via one shared `MutationObserver`, and
+cleaned up completely when they leave. No manual unbinding, no leaks.
+
+## Feature tour
+
+**Signals** — `ae.signal(v)`, `ae.computed(fn)`, `ae.effect(fn)`. Writes are
+batched per microtask; computeds are lazy and only notify when their value
+actually changes.
+
+**Rendering** — `.render(fn)` auto-tracks every signal read inside and re-runs
+on change. Sugar helpers `.text()` / `.cls()` / `.attr()` / `.show()` accept a
+plain value (applied once), a signal, or a function (both reactive).
+
+**Events** — `.press(fn)` is semantic activation: click everywhere, plus
+synthesized Enter/Space only for elements the browser doesn't natively
+activate (keyboard-accessible `div[tabindex]`, `[role=button]` for free, no
+double-fire on real buttons). `.hover(enter, leave)` and the `.on(type, fn,
+opts)` escape hatch round it out — all listeners per element, so non-bubbling
+events just work.
+
+**Keyed lists** — `.list(items, render, key)` stamps a native `<template>`
+per item with keyed reconciliation: reorders move nodes without remounting,
+unchanged items don't re-render, removed items are disposed.
+
+```html
+<ul data-ae="todos">
+  <template><li><b data-ae="title"></b></li></template>
+</ul>
+```
+
+```js
+ae('todos').list(todos, (li, todo, i) => {
+  ae.parts(li).title.textContent = `${i + 1}. ${todo.text}`;
+}, todo => todo.id);
+```
+
+**Two-way forms** — `.input(signal)` wires by field type: strings for
+text/select, booleans for checkboxes, real numbers for number/range. Writes
+are equality-guarded so echoes never move the caret.
+
+**Scoped roots** — `ae(name, root)` limits a handle to descendants of `root`:
+per-list behavior without global name collisions.
+
+Full API and semantics: **[API.md](API.md)**. Live playground: `bun run serve` → `index.html`.
+
+## Development
+
+```sh
+bun install
+bun run build   # tsc → dist/ae.js + dist/ae.d.ts
+bun run test    # jsdom smoke suite (build first)
+bun run serve   # demo at http://localhost:4242
+bun run min     # dist/ae.min.js
+```
+
+## Guarantees (the short version)
+
+- **Batching** — signal writes coalesce; each effect runs at most once per flush.
+- **Absolute disposal** — a disposed effect never runs again, even if already queued.
+- **Net-state lifecycle** — mount/cleanup reflect the *net* DOM change per task:
+  moves don't remount, `a→b→a` renames are no-ops.
+- **Fault isolation** — one throwing effect/binding/cleanup never takes down the rest.
+- **Runaway guard** — a self-triggering effect trips a circuit breaker instead of hanging the tab.
+
+## License
+
+[MIT](LICENSE)
