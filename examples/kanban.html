@@ -16,112 +16,146 @@
     }
     * { box-sizing: border-box; margin: 0; }
     body { background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem; }
-    header { max-width: 1000px; margin: 0 auto 1.5rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+    header { max-width: 1200px; margin: 0 auto 1.5rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
     h1 { font-size: 1.3rem; margin-right: auto; }
     h1 small { color: var(--dim); font-weight: 400; }
     input {
       background: var(--panel); border: 1px solid var(--border); color: var(--text);
-      padding: 0.55rem 0.8rem; border-radius: 8px; font-size: 0.9rem; min-width: 220px;
+      padding: 0.55rem 0.8rem; border-radius: 8px; font-size: 0.9rem; min-width: 200px;
     }
     input:focus { outline: none; border-color: var(--accent); }
+    header button {
+      background: var(--panel); border: 1px solid var(--border); color: var(--text);
+      padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer;
+    }
+    header button:hover:not(:disabled) { border-color: var(--accent); }
+    header button:disabled { opacity: 0.4; cursor: default; }
     .stats { color: var(--dim); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
-    main { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-    @media (max-width: 720px) { main { grid-template-columns: 1fr; } }
+    main { max-width: 1200px; margin: 0 auto; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: 1rem; overflow-x: auto; }
     .col { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; }
-    .col h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); display: flex; justify-content: space-between; margin-bottom: 0.75rem; }
+    .col h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .col h2 [data-ae="col-name"] { flex: 1; }
     .col h2 b { color: var(--text); }
-    .cards { display: flex; flex-direction: column; gap: 0.5rem; min-height: 60px; }
+    .col h2 button { background: none; border: none; color: var(--dim); cursor: pointer; }
+    .col h2 button:hover:not(:disabled) { color: #f87171; }
+    .col h2 button:disabled { opacity: 0.3; cursor: default; }
+    .cards { display: flex; flex-direction: column; gap: 0.5rem; min-height: 60px; border-radius: 8px; }
+    .cards.drop { outline: 2px dashed var(--accent); outline-offset: 4px; }
     .empty { color: var(--dim); font-size: 0.85rem; text-align: center; padding: 1rem 0; border: 1px dashed var(--border); border-radius: 8px; }
     .card {
       background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 8px;
       padding: 0.6rem 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;
+      cursor: grab;
     }
-    .card span:first-child { flex: 1; overflow-wrap: anywhere; }
+    .card [data-ae="card-title"] { flex: 1; overflow-wrap: anywhere; border-radius: 4px; padding: 0 2px; }
+    .card [data-ae="card-title"][contenteditable] { outline: 1px solid var(--accent); background: rgba(13, 148, 136, 0.1); cursor: text; }
     .card button {
       background: none; border: 1px solid transparent; color: var(--dim); cursor: pointer;
       border-radius: 6px; padding: 0.15rem 0.35rem; font-size: 0.85rem;
     }
     .card button:hover { color: var(--text); border-color: var(--border); background: rgba(255, 255, 255, 0.05); }
     .card button[data-ae="card-del"]:hover { color: #f87171; }
+    .card[data-prio="0"] [data-ae="card-prio"] { color: var(--dim); }
+    .card[data-prio="1"] [data-ae="card-prio"] { color: #fbbf24; }
+    .card[data-prio="2"] [data-ae="card-prio"] { color: #f87171; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>kanban <small>· ae dogfood</small></h1>
-    <input data-ae="new-card" placeholder="New card — Enter adds to Backlog">
+    <h1>kanban <small>· ae dogfood · dbl-click a title to edit, drag cards between columns</small></h1>
+    <input data-ae="new-card" placeholder="New card — Enter adds to first column">
     <input data-ae="card-filter" placeholder="Filter…">
+    <button data-ae="undo" title="Undo (Ctrl+Z)">↩ undo <b data-ae="undo-count"></b></button>
+    <button data-ae="add-col">+ column</button>
     <span class="stats" data-ae="stats"></span>
   </header>
 
-  <main>
-    <!-- Three columns, identical inner names: 'cards', 'card-title', 'card-left'…
-         Scoped handles (ae(name, columnEl)) keep them from colliding. -->
-    <section class="col" data-ae="column" data-col="backlog">
-      <h2>Backlog <b data-ae="col-count"></b></h2>
-      <div class="cards" data-ae="cards">
-        <p class="empty" data-ae="col-empty">empty</p>
-        <template>
-          <article class="card">
-            <span data-ae="card-title"></span>
-            <button data-ae="card-left" title="Move left">◀</button>
-            <button data-ae="card-right" title="Move right">▶</button>
-            <button data-ae="card-del" title="Delete">✕</button>
-          </article>
-        </template>
-      </div>
-    </section>
-
-    <section class="col" data-ae="column" data-col="doing">
-      <h2>In progress <b data-ae="col-count"></b></h2>
-      <div class="cards" data-ae="cards">
-        <p class="empty" data-ae="col-empty">empty</p>
-        <template>
-          <article class="card">
-            <span data-ae="card-title"></span>
-            <button data-ae="card-left" title="Move left">◀</button>
-            <button data-ae="card-right" title="Move right">▶</button>
-            <button data-ae="card-del" title="Delete">✕</button>
-          </article>
-        </template>
-      </div>
-    </section>
-
-    <section class="col" data-ae="column" data-col="done">
-      <h2>Done <b data-ae="col-count"></b></h2>
-      <div class="cards" data-ae="cards">
-        <p class="empty" data-ae="col-empty">empty</p>
-        <template>
-          <article class="card">
-            <span data-ae="card-title"></span>
-            <button data-ae="card-left" title="Move left">◀</button>
-            <button data-ae="card-right" title="Move right">▶</button>
-            <button data-ae="card-del" title="Delete">✕</button>
-          </article>
-        </template>
-      </div>
-    </section>
+  <!-- Columns are themselves stamped by a .list — the board is fully dynamic.
+       Inside each column, identical inner names ('cards', 'card-title', …)
+       never collide because .scope wires them per column root. -->
+  <main data-ae="board">
+    <template>
+      <section class="col" data-ae="column">
+        <h2>
+          <span data-ae="col-name"></span>
+          <b data-ae="col-count"></b>
+          <button data-ae="col-del" title="Delete column (cards move left)">✕</button>
+        </h2>
+        <div class="cards" data-ae="cards">
+          <p class="empty" data-ae="col-empty">empty</p>
+          <template>
+            <article class="card" data-ae="card" draggable="true">
+              <button data-ae="card-prio" title="Cycle priority">●</button>
+              <span data-ae="card-title"></span>
+              <button data-ae="card-left" title="Move left">◀</button>
+              <button data-ae="card-right" title="Move right">▶</button>
+              <button data-ae="card-del" title="Delete">✕</button>
+            </article>
+          </template>
+        </div>
+      </section>
+    </template>
   </main>
 
   <script type="module">
     import { ae } from '../dist/ae.js';
 
-    const COLS = ['backlog', 'doing', 'done'];
     const STORE = 'ae-kanban';
 
     // --- state, hydrated from localStorage --------------------------------
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(STORE) ?? 'null'); } catch { /* fresh start */ }
-    const cards = ae.signal(Array.isArray(saved) ? saved : [
-      { id: 1, title: 'Dogfood ae on something real', col: 'doing' },
-      { id: 2, title: 'Collect v3 friction notes', col: 'backlog' },
-      { id: 3, title: 'Ship ae v2', col: 'done' },
+    if (Array.isArray(saved)) saved = { cards: saved, cols: null }; // v1 shape: bare card array
+
+    const cols = ae.signal(saved?.cols ?? [
+      { id: 'backlog', name: 'Backlog' },
+      { id: 'doing', name: 'In progress' },
+      { id: 'done', name: 'Done' },
     ]);
+    const cards = ae.signal((saved?.cards ?? [
+      { id: 1, title: 'Dogfood ae on something real', col: 'doing', prio: 2 },
+      { id: 2, title: 'Collect v3 friction notes', col: 'backlog', prio: 1 },
+      { id: 3, title: 'Ship ae v2', col: 'done', prio: 0 },
+    ]).map((c) => ({ prio: 0, ...c })));
+
     let seq = cards.value.reduce((m, c) => Math.max(m, c.id), 0);
+    let colSeq = cols.value.length;
     const filter = ae.signal('');
 
-    // Persistence is just an effect: it tracks `cards` and re-saves on change.
-    ae.effect(() => localStorage.setItem(STORE, JSON.stringify(cards.value)));
+    // Persistence is just an effect: tracks both signals, re-saves on change.
+    ae.effect(() => localStorage.setItem(STORE, JSON.stringify({ cols: cols.value, cards: cards.value })));
+
+    // --- undo: snapshot before every mutation; signals make this trivial ----
+    const history = ae.signal([]);
+    const commit = (fn) => {
+      history.value = [...history.value.slice(-49), { cols: cols.value, cards: cards.value }];
+      fn();
+    };
+    const undo = () => {
+      const h = history.value;
+      if (!h.length) return;
+      history.value = h.slice(0, -1);
+      cols.value = h[h.length - 1].cols;
+      cards.value = h[h.length - 1].cards;
+    };
+    ae('undo')
+      .press(undo)
+      .attr('disabled', () => history.value.length === 0);
+    ae('undo-count').text(() => history.value.length || '');
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+    });
+
+    // --- card mutations ------------------------------------------------------
+    const patch = (id, delta) => commit(() => {
+      cards.value = cards.value.map((c) => c.id === id ? { ...c, ...delta } : c);
+    });
+    const move = (id, dir) => {
+      const card = cards.value.find((c) => c.id === id);
+      const next = cols.value[cols.value.findIndex((c) => c.id === card.col) + dir];
+      if (next) patch(id, { col: next.id });
+    };
 
     // --- header ------------------------------------------------------------
     const draft = ae.signal('');
@@ -131,7 +165,7 @@
         if (e.key !== 'Enter') return;
         const title = draft.value.trim();
         if (!title) return;
-        cards.value = [...cards.value, { id: ++seq, title, col: 'backlog' }];
+        commit(() => { cards.value = [...cards.value, { id: ++seq, title, col: cols.value[0].id, prio: 0 }]; });
         draft.value = '';
       });
 
@@ -142,46 +176,96 @@
       return q ? cards.value.filter((c) => c.title.toLowerCase().includes(q)) : cards.value;
     });
 
-    ae('stats').render((el) => {
-      const done = cards.value.filter((c) => c.col === 'done').length;
-      el.textContent = `${done}/${cards.value.length} done`;
-    });
+    ae('stats').text(() => `${cards.value.length} cards · ${cols.value.length} columns`);
 
-    // --- shared card actions (card recovered from the DOM via ae.itemOf) ----
-    const move = (id, dir) => {
-      cards.value = cards.value.map((c) => {
-        if (c.id !== id) return c;
-        const next = COLS[COLS.indexOf(c.col) + dir];
-        return next ? { ...c, col: next } : c;
-      });
-    };
+    ae('add-col').press(() => commit(() => {
+      let id;
+      do { id = `col-${++colSeq}`; } while (cols.value.some((c) => c.id === id));
+      cols.value = [...cols.value, { id, name: `Column ${cols.value.length + 1}` }];
+    }));
 
-    // --- per-column wiring ---------------------------------------------------
-    // .scope(): setup runs once per column root with real teardown, so this
-    // works unchanged even if columns are ever stamped dynamically.
+    // --- the board: columns are a keyed list too ------------------------------
+    ae('board').list(cols, (colEl, c) => {
+      ae.parts(colEl)['col-name'].textContent = c.name;
+    }, (c) => c.id);
+
+    // --- per-column wiring: .scope() runs once per stamped column root -------
     ae('column').scope((colEl) => {
-      const col = colEl.dataset.col;
-      const colCards = ae.computed(() => visible.value.filter((c) => c.col === col));
+      const colId = ae.itemOf(colEl).id;               // outer list item = the column
+      const idx = () => cols.value.findIndex((c) => c.id === colId);
+      const colCards = ae.computed(() => visible.value.filter((c) => c.col === colId));
 
       ae('cards', colEl).list(colCards, (card, c) => {
         ae.parts(card)['card-title'].textContent = c.title;
+        card.dataset.prio = c.prio;
       }, (c) => c.id);
 
       ae('col-count', colEl).text(() => colCards.value.length);
       ae('col-empty', colEl).show(() => colCards.value.length === 0);
+      ae('col-del', colEl)
+        .attr('disabled', () => cols.value.length <= 1)
+        .press(() => commit(() => {
+          const target = cols.value[idx() - 1] ?? cols.value[idx() + 1];
+          if (!target) return;
+          cols.value = cols.value.filter((c) => c.id !== colId);
+          cards.value = cards.value.map((c) => c.col === colId ? { ...c, col: target.id } : c);
+        }));
 
+      // Edge arrows follow the *live* column order: adding a column to the
+      // right makes the old last column's ▶ appear.
+      ae('card-left', colEl).show(() => idx() > 0);
+      ae('card-right', colEl).show(() => idx() < cols.value.length - 1);
       ae('card-left', colEl).press((btn) => move(ae.itemOf(btn).id, -1));
       ae('card-right', colEl).press((btn) => move(ae.itemOf(btn).id, +1));
       ae('card-del', colEl).press((btn) => {
         const { id } = ae.itemOf(btn);
-        cards.value = cards.value.filter((c) => c.id !== id);
+        commit(() => { cards.value = cards.value.filter((c) => c.id !== id); });
+      });
+    });
+
+    // --- behaviors identical in every column stay global ---------------------
+
+    // Priority: cycle 0 → 1 → 2 → 0 (rendered via [data-prio] CSS).
+    ae('card-prio').press((btn) => {
+      const c = ae.itemOf(btn);
+      patch(c.id, { prio: (c.prio + 1) % 3 });
+    });
+
+    // Inline editing: dbl-click a title, Enter/blur saves, Escape cancels.
+    ae('card-title')
+      .on('dblclick', (el) => { el.setAttribute('contenteditable', ''); el.focus(); })
+      .on('keydown', (el, e) => {
+        if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+        if (e.key === 'Escape') { el.textContent = ae.itemOf(el).title; el.blur(); }
+      })
+      .on('blur', (el) => {
+        if (!el.hasAttribute('contenteditable')) return;
+        el.removeAttribute('contenteditable');
+        const { id, title: old } = ae.itemOf(el);
+        const title = el.textContent.trim();
+        if (title && title !== old) patch(id, { title });
+        else el.textContent = old;
       });
 
-      // Edge columns: hide the pointless arrow. Plain-value binding applies
-      // once per element — including cards stamped later.
-      if (col === COLS[0]) ae('card-left', colEl).show(false);
-      if (col === COLS[COLS.length - 1]) ae('card-right', colEl).show(false);
-    });
+    // Drag & drop: itemOf resolves the card on the source and — because the
+    // drop target sits inside a column stamped by the *board* list — the
+    // column on the target.
+    let dragging = null;
+    const clearDrop = () => ae('cards').each((el) => el.classList.remove('drop'));
+    ae('card')
+      .on('dragstart', (el) => { dragging = ae.itemOf(el).id; })
+      .on('dragend', () => { dragging = null; clearDrop(); });
+    ae('cards')
+      .on('dragover', (el, e) => { e.preventDefault(); el.classList.add('drop'); })
+      .on('dragleave', (el) => el.classList.remove('drop'))
+      .on('drop', (el, e) => {
+        e.preventDefault();
+        clearDrop();
+        const target = ae.itemOf(el);                  // the column this container lives in
+        const card = cards.value.find((c) => c.id === dragging);
+        if (card && target && card.col !== target.id) patch(card.id, { col: target.id });
+        dragging = null;
+      });
   </script>
 </body>
 </html>

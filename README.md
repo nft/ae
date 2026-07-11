@@ -74,6 +74,10 @@ per-list behavior without global name collisions.
 
 Full API and semantics: **[API.md](API.md)**. Live playground: `bun run serve` → `index.html`.
 
+Real app: **[examples/kanban.html](examples/kanban.html)** — a kanban with
+drag & drop, dynamic columns, inline editing, undo, filtering, and
+localStorage persistence in ~170 lines of JS.
+
 ## Performance
 
 Keyed-list stress numbers, measured **end-to-end** — signal write through
