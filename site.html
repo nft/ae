@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ae — the HTML you wrote is the app</title>
-  <meta name="description" content="ae is a 3 KB attribute-based reactivity library. One data-ae attribute, signals, keyed lists, two-way forms. No virtual DOM, no hydration, no build step.">
+  <meta name="description" content="ae is a 3 KB attribute-based reactivity library. One data-ae attribute, signals, keyed lists, two-way forms, View-Transition animation. No virtual DOM, no hydration, no build step.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,6 +34,14 @@
       .demo-field { @apply rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-800 outline-none transition focus:border-amber-600 focus:ring-2 focus:ring-amber-600/15; }
     }
   </style>
+  <style>
+    /* View Transitions (ae.transition demo): tune the browser-driven morphs. */
+    ::view-transition-group(*) { animation-duration: 250ms; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+    @media (prefers-reduced-motion: reduce) {
+      ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+    }
+  </style>
 </head>
 <body class="bg-cream font-sans text-ink antialiased">
 
@@ -41,7 +49,7 @@
   <nav class="sticky top-0 z-10 border-b border-stone-200/70 bg-cream/85 backdrop-blur">
     <div class="mx-auto flex max-w-5xl items-center gap-6 px-6 py-3.5">
       <a href="#" class="font-display text-2xl font-semibold tracking-tight">ae</a>
-      <span class="rounded-full border border-amber-700/25 bg-amber-700/5 px-2.5 py-0.5 font-mono text-[11px] text-amber-800">3 KB · zero deps</span>
+      <span class="rounded-full border border-amber-700/25 bg-amber-700/5 px-2.5 py-0.5 font-mono text-[11px] text-amber-800">3.2 KB · zero deps</span>
       <div class="ml-auto hidden items-center gap-6 text-sm text-stone-500 sm:flex">
         <a href="#cases" class="transition hover:text-ink">Cases</a>
         <a href="#docs" class="transition hover:text-ink">Docs</a>
@@ -103,7 +111,7 @@ ae('save').press(() => saves.value++);</code></pre>
       </div>
       <div>
         <h3 class="font-display text-xl font-medium">Small on purpose</h3>
-        <p class="mt-2 text-sm leading-relaxed text-stone-600">~3 KB min+gzip, zero dependencies, written in TypeScript. The whole API fits on a card — and it's further down this page.</p>
+        <p class="mt-2 text-sm leading-relaxed text-stone-600">3.2 KB min+gzip, zero dependencies, written in TypeScript. The whole API fits on a card — and it's further down this page.</p>
       </div>
     </div>
   </section>
@@ -267,6 +275,39 @@ ae('loud').input(loud);</code></pre>
         </div>
       </div>
     </section>
+
+    <!-- case 5: animation (v4) -->
+    <section class="grid items-start gap-10 md:grid-cols-2">
+      <div>
+        <span class="font-mono text-[11px] uppercase tracking-widest text-amber-700">ae.transition</span>
+        <h2 class="mt-3 font-display text-3xl font-medium tracking-tight">Animation state, zero choreography</h2>
+        <p class="mt-4 leading-relaxed text-stone-600">
+          Wrap the writes in <code class="font-mono text-[15px]">ae.transition</code> and the browser
+          animates whatever changed — enters, exits, reorders — as View Transitions you style in pure
+          CSS. A unique <code class="font-mono text-[15px]">view-transition-name</code> makes elements
+          <em>morph</em>, even between two lists. Unsupported browsers simply apply the change instantly.
+        </p>
+        <pre class="mt-6 overflow-x-auto rounded-xl bg-stone-900 p-5 text-[13px] leading-relaxed text-stone-200"><code class="hl">ae('deck').list(chips, (el, chip) => {
+  el.textContent = chip.label;
+  el.style.viewTransitionName = `chip-${chip.id}`;
+}, (chip) => chip.id);
+
+ae('mix').press(() => ae.transition(() => {
+  chips.value = shuffled(chips.value);
+}));</code></pre>
+      </div>
+      <div class="rounded-2xl border border-stone-200 bg-white p-6 md:mt-14">
+        <div class="flex gap-2">
+          <button data-ae="d5-shuffle" class="demo-btn">Shuffle</button>
+          <button data-ae="d5-add" class="demo-btn">Add</button>
+          <button data-ae="d5-remove" class="demo-btn">Remove</button>
+        </div>
+        <div data-ae="d5-deck" class="mt-4 flex min-h-[76px] flex-wrap content-start gap-2">
+          <template><span data-ae="d5-chip"></span></template>
+        </div>
+        <p class="mt-4 font-mono text-[11px] text-stone-400">Chrome 111+ / Safari 18+ animate the morphs; elsewhere it's instant.</p>
+      </div>
+    </section>
   </main>
 
   <!-- ===== docs ===== -->
@@ -289,6 +330,8 @@ ae('loud').input(loud);</code></pre>
             <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.effect(fn)</dt><dd class="text-stone-600">auto-tracked side effect; returns dispose</dd></div>
             <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.parts(root)</dt><dd class="text-stone-600">named <code class="font-mono text-[12px]">data-ae</code> descendants of a stamped node</dd></div>
             <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.itemOf(el)</dt><dd class="text-stone-600">the current list item an element belongs to</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.transition(fn)</dt><dd class="text-stone-600">run writes inside a View Transition; enters, exits, and moves animate in CSS</dd></div>
+            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.settled()</dt><dd class="text-stone-600">resolves when writes and mounts have drained</dd></div>
             <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.isSignal(v)</dt><dd class="text-stone-600">true for signals and computeds</dd></div>
           </dl>
         </div>
@@ -347,7 +390,7 @@ ae('loud').input(loud);</code></pre>
       <span class="font-display text-lg font-semibold text-ink">ae</span>
       <span>MIT license</span>
       <span>TypeScript</span>
-      <span>~3 KB min+gzip</span>
+      <span>3.2 KB min+gzip</span>
       <span class="ml-auto">This page runs on ae — view source.</span>
     </div>
   </footer>
@@ -457,6 +500,35 @@ ae('loud').input(loud);</code></pre>
       const { id } = ae.itemOf(btn);
       widgets.value = widgets.value.filter((w) => w.id !== id);
     });
+
+    // --- case 5: animation via ae.transition -------------------------------------
+    const PALETTE = [
+      'bg-amber-700/10 text-amber-900',
+      'bg-orange-700/10 text-orange-900',
+      'bg-rose-700/10 text-rose-900',
+      'bg-yellow-600/15 text-yellow-900',
+      'bg-stone-700/10 text-stone-800',
+    ];
+    const WORDS = ['amber', 'clay', 'sienna', 'ochre', 'umber', 'rust', 'sand', 'terracotta'];
+    let chipSeq = 0;
+    const makeChip = () => ({ id: ++chipSeq, label: WORDS[(chipSeq - 1) % WORDS.length] });
+    const chips = ae.signal(Array.from({ length: 5 }, makeChip));
+
+    ae('d5-deck').list(chips, (el, chip) => {
+      el.textContent = chip.label;
+      el.className = `rounded-full px-3.5 py-1.5 text-sm font-medium ${PALETTE[chip.id % PALETTE.length]}`;
+      el.style.viewTransitionName = `chip-${chip.id}`;
+    }, (c) => c.id);
+
+    ae('d5-shuffle').press(() => ae.transition(() => {
+      chips.value = [...chips.value].sort(() => Math.random() - 0.5);
+    }));
+    ae('d5-add').press(() => ae.transition(() => {
+      chips.value = [...chips.value, makeChip()];
+    }));
+    ae('d5-remove').press(() => ae.transition(() => {
+      chips.value = chips.value.slice(0, -1);
+    }));
   </script>
 </body>
 </html>

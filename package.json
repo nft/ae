@@ -1,7 +1,7 @@
 {
   "name": "ae",
-  "version": "0.3.0",
-  "description": "Tiny attribute-based behavior + reactivity library. HTML is the source of truth: one data-ae attribute, signals, keyed lists, two-way forms. No virtual DOM, no hydration, no build step required.",
+  "version": "0.4.0",
+  "description": "Tiny attribute-based behavior + reactivity library. HTML is the source of truth: one data-ae attribute, signals, keyed lists, two-way forms, View-Transition animation. No virtual DOM, no hydration, no build step required.",
   "keywords": [
     "reactivity",
     "signals",
@@ -9,7 +9,8 @@
     "binder",
     "frontend",
     "lightweight",
-    "no-vdom"
+    "no-vdom",
+    "view-transitions"
   ],
   "license": "MIT",
   "private": true,

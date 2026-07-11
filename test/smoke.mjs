@@ -951,5 +951,91 @@ const fireInput = (node) => node.dispatchEvent(new dom.window.Event('input', { b
   assert(ae.itemOf(section) === 'A', 'nested: outer stamped node yields the outer item');
 }
 
+// ============================================================================
+// ae.settled + ae.transition (v4)
+// ============================================================================
+
+// --- settled: resolves only after flush AND mount pipeline are done ---------
+{
+  const host = el(`<div data-ae="st-list"><template><p><span data-ae="st-part"></span></p></template></div>`);
+  ae('st-part').mount((n) => { n.textContent = 'mounted'; });
+  const items = ae.signal([{ id: 1 }]);
+  ae('st-list').list(items, () => {}, (x) => x.id);
+  await ae.settled();
+  assert(host.querySelectorAll('p').length === 1, 'settled waits for list stamping');
+  assert(host.querySelector('[data-ae="st-part"]').textContent === 'mounted', 'settled waits past MutationObserver mount delivery');
+  items.value = [{ id: 1 }, { id: 2 }];
+  await ae.settled();
+  assert(host.querySelectorAll('p').length === 2, 'settled after a later write sees the new DOM');
+  host.remove();
+  await tick();
+}
+
+// --- transition: fallback path (no startViewTransition, as in jsdom) --------
+{
+  const target = el(`<b data-ae="tr-txt"></b>`);
+  const msg = ae.signal('a');
+  ae('tr-txt').text(msg);
+  await tick();
+  let ran = false;
+  const ret = ae.transition(() => { ran = true; msg.value = 'b'; });
+  assert(ran === true, 'transition fallback runs fn synchronously');
+  assert(ret === undefined, 'transition fallback returns undefined');
+  await tick();
+  assert(target.textContent === 'b', 'fallback mutation still applies');
+  target.remove();
+  await tick();
+}
+
+// --- transition: with (mocked) document.startViewTransition ------------------
+{
+  const target = el(`<div data-ae="vt-list"><template><q data-ae="vt-part"></q></template></div>`);
+  ae('vt-part').mount((n) => { n.textContent = 'ok'; });
+  const items = ae.signal([]);
+  ae('vt-list').list(items, () => {}, (x) => x);
+  await tick();
+
+  let calls = 0;
+  document.startViewTransition = (cb) => {
+    calls++;
+    const done = cb();
+    return { updateCallbackDone: done, finished: done, ready: done, skipTransition() {} };
+  };
+
+  const t = ae.transition(() => { items.value = ['x', 'y']; });
+  assert(calls === 1, 'transition uses document.startViewTransition when available');
+  assert(typeof t.skipTransition === 'function', 'transition returns the ViewTransition object');
+  assert(target.querySelectorAll('q').length === 0, 'writes stay batched — DOM unchanged synchronously');
+  await t.updateCallbackDone;
+  assert(target.querySelectorAll('q').length === 2, 'updateCallbackDone resolves only after the DOM applied');
+  assert([...target.querySelectorAll('q')].every((n) => n.textContent === 'ok'), 'updateCallbackDone resolves after the mount pipeline too');
+  delete document.startViewTransition;
+  target.remove();
+  await tick();
+}
+
+// --- transition: cascading writes from mounts settle before the snapshot ----
+{
+  document.startViewTransition = (cb) => {
+    const done = cb();
+    return { updateCallbackDone: done, finished: done, ready: done, skipTransition() {} };
+  };
+  const host = el(`<div data-ae="vt2-list"><template><i></i></template></div>`);
+  const shown = el(`<u data-ae="vt2-count"></u>`);
+  const cascade = ae.signal(0);
+  ae('vt2-count').text(cascade);
+  const items2 = ae.signal([]);
+  ae('vt2-list').list(items2, (n) => { n.dataset.ae = 'vt2-part'; }, (x) => x);
+  ae('vt2-part').mount(() => { cascade.value++; });
+  await tick();
+  const t2 = ae.transition(() => { items2.value = ['a']; });
+  await t2.updateCallbackDone;
+  assert(shown.textContent === '1', 'cascading writes from mount bindings settle before the new snapshot');
+  delete document.startViewTransition;
+  host.remove();
+  shown.remove();
+  await tick();
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

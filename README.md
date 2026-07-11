@@ -4,7 +4,7 @@ Tiny attribute-based behavior + reactivity library. **HTML is the source of
 truth** — you write real markup, `ae` attaches behavior to it. No virtual DOM,
 no hydration, no template syntax, no build step required.
 
-**3 KB** min+gzip · zero dependencies · TypeScript · one `data-ae` attribute
+**3.2 KB** min+gzip · zero dependencies · TypeScript · one `data-ae` attribute
 
 ```html
 <button data-ae="save">Save</button>
@@ -71,6 +71,11 @@ are equality-guarded so echoes never move the caret.
 
 **Scoped roots** — `ae(name, root)` limits a handle to descendants of `root`:
 per-list behavior without global name collisions.
+
+**Animation** — `ae.transition(fn)` runs your signal writes inside a browser
+View Transition: list enters, exits, and reorders animate in pure CSS, and
+elements with a `view-transition-name` morph — even across lists. Falls back
+to a plain call where unsupported.
 
 Full API and semantics: **[API.md](API.md)**. Live playground: `bun run serve` → `index.html`.
 

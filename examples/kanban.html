@@ -58,6 +58,13 @@
     .card[data-prio="0"] [data-ae="card-prio"] { color: var(--dim); }
     .card[data-prio="1"] [data-ae="card-prio"] { color: #fbbf24; }
     .card[data-prio="2"] [data-ae="card-prio"] { color: #f87171; }
+
+    /* View Transitions (ae.transition): tune the browser-driven morphs. */
+    ::view-transition-group(*) { animation-duration: 220ms; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+    @media (prefers-reduced-motion: reduce) {
+      ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -127,17 +134,21 @@
     ae.effect(() => localStorage.setItem(STORE, JSON.stringify({ cols: cols.value, cards: cards.value })));
 
     // --- undo: snapshot before every mutation; signals make this trivial ----
+    // Every mutation goes through commit(), so ae.transition() animates them
+    // all — moves, drops, deletes, undo — via browser View Transitions.
     const history = ae.signal([]);
     const commit = (fn) => {
       history.value = [...history.value.slice(-49), { cols: cols.value, cards: cards.value }];
-      fn();
+      ae.transition(fn);
     };
     const undo = () => {
       const h = history.value;
       if (!h.length) return;
       history.value = h.slice(0, -1);
-      cols.value = h[h.length - 1].cols;
-      cards.value = h[h.length - 1].cards;
+      ae.transition(() => {
+        cols.value = h[h.length - 1].cols;
+        cards.value = h[h.length - 1].cards;
+      });
     };
     ae('undo')
       .press(undo)
@@ -187,6 +198,7 @@
     // --- the board: columns are a keyed list too ------------------------------
     ae('board').list(cols, (colEl, c) => {
       ae.parts(colEl)['col-name'].textContent = c.name;
+      colEl.style.viewTransitionName = `col-${c.id}`;
     }, (c) => c.id);
 
     // --- per-column wiring: .scope() runs once per stamped column root -------
@@ -198,6 +210,9 @@
       ae('cards', colEl).list(colCards, (card, c) => {
         ae.parts(card)['card-title'].textContent = c.title;
         card.dataset.prio = c.prio;
+        // Unique name per card: cross-column moves MORPH between the old and
+        // new node, even though underneath it's a remount in another list.
+        card.style.viewTransitionName = `card-${c.id}`;
       }, (c) => c.id);
 
       ae('col-count', colEl).text(() => colCards.value.length);

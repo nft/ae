@@ -132,6 +132,30 @@ ae('remove', container).press((btn) => {
 True for `Signal` and `Computed` instances. The imperative helpers use this to
 decide between one-shot and reactive application.
 
+### `ae.transition(fn) → ViewTransition | undefined`
+Runs `fn` inside `document.startViewTransition`, so every DOM change its
+signal writes cause — list stamps, removals, reorders, text — is animated
+by the browser. The "new" snapshot is taken only after ae has settled
+(flush **and** mount pipeline, including cascading writes from mount
+bindings). Where View Transitions are unsupported, `fn` runs plainly and
+`undefined` is returned — a no-op enhancement, not a requirement.
+
+```js
+ae.transition(() => { cards.value = next; });
+```
+
+Style the animation in pure CSS (`::view-transition-old/new/group`). Give
+elements a unique `view-transition-name` and they **morph** — including
+across `.list` containers, which visually erases the cross-container
+remount (see Lists). Respect `prefers-reduced-motion` in your CSS; the
+browser does not do it for you.
+
+### `ae.settled() → Promise<void>`
+Resolves once pending signal writes and everything they cascade into (list
+stamping, mounts, effects scheduled by mounts) have drained. What
+`ae.transition` awaits internally; also handy in tests instead of
+hand-rolled `setTimeout` ticks.
+
 ### `ae.effect(fn) → dispose`
 Auto-tracked side effect not tied to an element (logging, storage, fetch
 triggers). Runs immediately, re-runs when its signals change. Returns a
@@ -222,7 +246,9 @@ These guarantees hold **within one container**. An item that moves *between*
 two `.list` containers (e.g. a kanban card changing columns) is a removal in
 one list and a fresh stamp in the other — a **new DOM node**, so transient
 state on the old node (focus, CSS transitions, scroll) does not travel with
-it.
+it. Visually this is fixable: wrap the mutation in `ae.transition` and give
+the stamped nodes a unique `view-transition-name` — the browser morphs the
+old node into the new one.
 
 ### Escape hatches
 

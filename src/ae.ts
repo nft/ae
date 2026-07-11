@@ -70,6 +70,51 @@ function schedule(run: Runner): void {
   }
 }
 
+/**
+ * Resolves once pending signal writes — and everything they cascade into
+ * (list stamping, the mount pipeline, effects scheduled by mounts) — have
+ * drained and the DOM is fully settled. Each hop is a macrotask, so
+ * MutationObserver deliveries land in between hops.
+ */
+export function settled(): Promise<void> {
+  return new Promise((resolve) => {
+    const check = (): void => {
+      if (scheduled || flushing) setTimeout(check, 0);
+      else resolve();
+    };
+    setTimeout(check, 0);
+  });
+}
+
+interface ViewTransitionLike {
+  finished: Promise<unknown>;
+  ready: Promise<unknown>;
+  updateCallbackDone: Promise<unknown>;
+  skipTransition(): void;
+}
+
+/**
+ * Run `fn` inside a View Transition, so every DOM change its signal writes
+ * cause — list stamps, removals, reorders, text — is animated by the
+ * browser (style with `::view-transition-*`; give elements a
+ * `view-transition-name` to make them morph). The "new" snapshot is taken
+ * only after ae has settled. Falls back to a plain `fn()` call where
+ * `document.startViewTransition` is unsupported.
+ */
+export function transition(fn: () => void): ViewTransitionLike | undefined {
+  const doc = document as unknown as {
+    startViewTransition?: (cb: () => Promise<void>) => ViewTransitionLike;
+  };
+  if (!doc.startViewTransition) {
+    fn();
+    return undefined;
+  }
+  return doc.startViewTransition(async () => {
+    fn();
+    await settled();
+  });
+}
+
 function track(subs: Set<Runner>): void {
   if (activeRunner) {
     subs.add(activeRunner);
@@ -819,5 +864,7 @@ export const ae = Object.assign(
     isSignal,
     parts,
     itemOf,
+    settled,
+    transition,
   },
 );
