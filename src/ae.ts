@@ -367,6 +367,33 @@ export class Handle {
   }
 
   /**
+   * One-time setup per matching root element, with real teardown — the safe
+   * way to wire scoped handles for roots that come and go (e.g. nodes
+   * stamped by .list). fn runs when the root mounts. Scoped handles FIRST
+   * CREATED inside fn (synchronously) are retired when the root unmounts,
+   * so a remount re-runs fn against fresh handles instead of stacking
+   * duplicate bindings onto cached ones. A returned function runs first at
+   * teardown.
+   */
+  scope(fn: (el: HTMLElement) => Cleanup | void): this {
+    return this._bind((el) => {
+      const created = new Set<HTMLElement>();
+      const prev = scopeCreated;
+      scopeCreated = created;
+      let cleanup: Cleanup | void;
+      try {
+        cleanup = fn(el);
+      } finally {
+        scopeCreated = prev;
+      }
+      return () => {
+        if (typeof cleanup === 'function') cleanup();
+        for (const root of created) scopedHandles.delete(root);
+      };
+    });
+  }
+
+  /**
    * Runs fn(el) per element, auto-tracking every signal read inside.
    * Re-runs when any of them changes. Disposed when the element is removed.
    */
@@ -646,6 +673,10 @@ const handles = new Map<string, Handle>();
 const scopedHandles = new WeakMap<HTMLElement, Map<string, Handle>>();
 let anyScoped = false;
 
+// While a .scope() callback runs, roots whose handle maps are first created
+// get collected here, to be retired when that scope's root unmounts.
+let scopeCreated: Set<HTMLElement> | null = null;
+
 const partsCache = new WeakMap<HTMLElement, Record<string, HTMLElement>>();
 
 /**
@@ -741,6 +772,7 @@ export const ae = Object.assign(
       if (!map) {
         map = new Map();
         scopedHandles.set(root, map);
+        if (scopeCreated) scopeCreated.add(root);
       }
       let handle = map.get(name);
       if (!handle) {

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ae kanban — dogfood example</title>
+  <style>
+    :root {
+      --bg: #0b0b0e;
+      --panel: #141419;
+      --border: rgba(255, 255, 255, 0.09);
+      --text: #ececf1;
+      --dim: #9a9aa3;
+      --accent: #0d9488;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem; }
+    header { max-width: 1000px; margin: 0 auto 1.5rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+    h1 { font-size: 1.3rem; margin-right: auto; }
+    h1 small { color: var(--dim); font-weight: 400; }
+    input {
+      background: var(--panel); border: 1px solid var(--border); color: var(--text);
+      padding: 0.55rem 0.8rem; border-radius: 8px; font-size: 0.9rem; min-width: 220px;
+    }
+    input:focus { outline: none; border-color: var(--accent); }
+    .stats { color: var(--dim); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+    main { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    @media (max-width: 720px) { main { grid-template-columns: 1fr; } }
+    .col { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; }
+    .col h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); display: flex; justify-content: space-between; margin-bottom: 0.75rem; }
+    .col h2 b { color: var(--text); }
+    .cards { display: flex; flex-direction: column; gap: 0.5rem; min-height: 60px; }
+    .empty { color: var(--dim); font-size: 0.85rem; text-align: center; padding: 1rem 0; border: 1px dashed var(--border); border-radius: 8px; }
+    .card {
+      background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.6rem 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;
+    }
+    .card span:first-child { flex: 1; overflow-wrap: anywhere; }
+    .card button {
+      background: none; border: 1px solid transparent; color: var(--dim); cursor: pointer;
+      border-radius: 6px; padding: 0.15rem 0.35rem; font-size: 0.85rem;
+    }
+    .card button:hover { color: var(--text); border-color: var(--border); background: rgba(255, 255, 255, 0.05); }
+    .card button[data-ae="card-del"]:hover { color: #f87171; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>kanban <small>· ae dogfood</small></h1>
+    <input data-ae="new-card" placeholder="New card — Enter adds to Backlog">
+    <input data-ae="card-filter" placeholder="Filter…">
+    <span class="stats" data-ae="stats"></span>
+  </header>
+
+  <main>
+    <!-- Three columns, identical inner names: 'cards', 'card-title', 'card-left'…
+         Scoped handles (ae(name, columnEl)) keep them from colliding. -->
+    <section class="col" data-ae="column" data-col="backlog">
+      <h2>Backlog <b data-ae="col-count"></b></h2>
+      <div class="cards" data-ae="cards">
+        <p class="empty" data-ae="col-empty">empty</p>
+        <template>
+          <article class="card">
+            <span data-ae="card-title"></span>
+            <button data-ae="card-left" title="Move left">◀</button>
+            <button data-ae="card-right" title="Move right">▶</button>
+            <button data-ae="card-del" title="Delete">✕</button>
+          </article>
+        </template>
+      </div>
+    </section>
+
+    <section class="col" data-ae="column" data-col="doing">
+      <h2>In progress <b data-ae="col-count"></b></h2>
+      <div class="cards" data-ae="cards">
+        <p class="empty" data-ae="col-empty">empty</p>
+        <template>
+          <article class="card">
+            <span data-ae="card-title"></span>
+            <button data-ae="card-left" title="Move left">◀</button>
+            <button data-ae="card-right" title="Move right">▶</button>
+            <button data-ae="card-del" title="Delete">✕</button>
+          </article>
+        </template>
+      </div>
+    </section>
+
+    <section class="col" data-ae="column" data-col="done">
+      <h2>Done <b data-ae="col-count"></b></h2>
+      <div class="cards" data-ae="cards">
+        <p class="empty" data-ae="col-empty">empty</p>
+        <template>
+          <article class="card">
+            <span data-ae="card-title"></span>
+            <button data-ae="card-left" title="Move left">◀</button>
+            <button data-ae="card-right" title="Move right">▶</button>
+            <button data-ae="card-del" title="Delete">✕</button>
+          </article>
+        </template>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { ae } from '../dist/ae.js';
+
+    const COLS = ['backlog', 'doing', 'done'];
+    const STORE = 'ae-kanban';
+
+    // --- state, hydrated from localStorage --------------------------------
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(STORE) ?? 'null'); } catch { /* fresh start */ }
+    const cards = ae.signal(Array.isArray(saved) ? saved : [
+      { id: 1, title: 'Dogfood ae on something real', col: 'doing' },
+      { id: 2, title: 'Collect v3 friction notes', col: 'backlog' },
+      { id: 3, title: 'Ship ae v2', col: 'done' },
+    ]);
+    let seq = cards.value.reduce((m, c) => Math.max(m, c.id), 0);
+    const filter = ae.signal('');
+
+    // Persistence is just an effect: it tracks `cards` and re-saves on change.
+    ae.effect(() => localStorage.setItem(STORE, JSON.stringify(cards.value)));
+
+    // --- header ------------------------------------------------------------
+    const draft = ae.signal('');
+    ae('new-card')
+      .input(draft)
+      .on('keydown', (el, e) => {
+        if (e.key !== 'Enter') return;
+        const title = draft.value.trim();
+        if (!title) return;
+        cards.value = [...cards.value, { id: ++seq, title, col: 'backlog' }];
+        draft.value = '';
+      });
+
+    ae('card-filter').input(filter);
+
+    const visible = ae.computed(() => {
+      const q = filter.value.trim().toLowerCase();
+      return q ? cards.value.filter((c) => c.title.toLowerCase().includes(q)) : cards.value;
+    });
+
+    ae('stats').render((el) => {
+      const done = cards.value.filter((c) => c.col === 'done').length;
+      el.textContent = `${done}/${cards.value.length} done`;
+    });
+
+    // --- shared card actions (id read from the DOM key stamp) --------------
+    const idOf = (btn) => Number(btn.closest('[data-key]').dataset.key);
+    const move = (id, dir) => {
+      cards.value = cards.value.map((c) => {
+        if (c.id !== id) return c;
+        const next = COLS[COLS.indexOf(c.col) + dir];
+        return next ? { ...c, col: next } : c;
+      });
+    };
+
+    // --- per-column wiring ---------------------------------------------------
+    // .scope(): setup runs once per column root with real teardown, so this
+    // works unchanged even if columns are ever stamped dynamically.
+    ae('column').scope((colEl) => {
+      const col = colEl.dataset.col;
+      const colCards = ae.computed(() => visible.value.filter((c) => c.col === col));
+
+      ae('cards', colEl).list(colCards, (card, c) => {
+        ae.parts(card)['card-title'].textContent = c.title;
+        card.dataset.key = c.id;
+      }, (c) => c.id);
+
+      ae('col-count', colEl).text(() => colCards.value.length);
+      ae('col-empty', colEl).show(() => colCards.value.length === 0);
+
+      ae('card-left', colEl).press((btn) => move(idOf(btn), -1));
+      ae('card-right', colEl).press((btn) => move(idOf(btn), +1));
+      ae('card-del', colEl).press((btn) => {
+        const id = idOf(btn);
+        cards.value = cards.value.filter((c) => c.id !== id);
+      });
+
+      // Edge columns: hide the pointless arrow. Plain-value binding applies
+      // once per element — including cards stamped later.
+      if (col === COLS[0]) ae('card-left', colEl).show(false);
+      if (col === COLS[COLS.length - 1]) ae('card-right', colEl).show(false);
+    });
+  </script>
+</body>
+</html>

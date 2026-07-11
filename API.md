@@ -60,12 +60,27 @@ ae('remove', container).press((btn) => {
 });
 ```
 
+When the root itself can come and go — stamped by `.list`, or removed and
+re-added — do the setup inside **`.scope`** instead of grabbing the element
+imperatively:
+
+```js
+ae('column').scope((colEl) => {
+  ae('cards', colEl).list(...);
+  ae('card-del', colEl).press(...);
+});
+```
+
+`.scope` runs once per root and retires the scoped handles it created when
+the root unmounts, so a remount rebuilds them cleanly.
+
 Two caveats, both consequences of handles being cached and append-only:
 
-- **Set a scoped handle up once per root.** Re-running the same setup for the
-  same root (e.g. inside a `.mount` callback of a root that is removed and
-  re-added, or inside a `.list` render, which re-runs) stacks duplicate
-  bindings on the cached handle.
+- **Set a scoped handle up once per root.** Re-running the same setup for
+  the same root stacks duplicate bindings on the cached handle. In
+  particular, never create scoped handles inside a `.list` *render*
+  callback (it re-runs) or a bare `.mount` callback of a removable root —
+  that's exactly what `.scope` is for.
 - **Moving an element out of the scope does not unbind it.** Net-state
   lifecycle means moves never remount; a bound element reparented outside
   `root` keeps its scoped bindings until it actually leaves the DOM (or is
@@ -119,6 +134,7 @@ element first: `fn(el, ...)` — so one handle with many elements just works.
 | method | behavior |
 |---|---|
 | `.mount(fn)` | Runs `fn(el)` once per matching element — immediately for existing ones, and for any element added later (via one shared `MutationObserver`). If `fn` returns a function, it runs as cleanup when the element is removed from the DOM. |
+| `.scope(fn)` | Like `.mount`, but for **per-root setup that creates scoped handles**. Scoped handles first created inside `fn` (synchronously) are retired when the root unmounts, so a remount re-runs `fn` against fresh handles instead of stacking duplicate bindings onto cached ones. Use it whenever the root can come and go — e.g. nodes stamped by `.list`. A returned function runs first at teardown. |
 
 ### Rendering (reactive)
 
@@ -188,6 +204,12 @@ same reference, same index — don't re-render); reordering moves nodes without
 remounting `data-ae` bindings inside them; vanished keys remove the node and
 dispose its effect; container unmount disposes everything. `data-ae` elements
 inside the template participate in the global lifecycle as usual.
+
+These guarantees hold **within one container**. An item that moves *between*
+two `.list` containers (e.g. a kanban card changing columns) is a removal in
+one list and a fresh stamp in the other — a **new DOM node**, so transient
+state on the old node (focus, CSS transitions, scroll) does not travel with
+it.
 
 ### Escape hatches
 

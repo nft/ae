@@ -814,5 +814,95 @@ const fireInput = (node) => node.dispatchEvent(new dom.window.Event('input', { b
   assert(presses === 1, 'same-name button outside the container never fires the scoped handler');
 }
 
+// ===========================================================================
+// .scope(): per-root setup with teardown
+// ===========================================================================
+
+// --- the core regression: remount re-runs setup WITHOUT stacking bindings ----------
+{
+  const root = el('<div data-ae="sc-root"><button data-ae="sc-btn"></button></div>');
+  const btn = root.querySelector('button');
+  await tick();
+  let setups = 0, presses = 0, cleanups = 0;
+  ae('sc-root').scope((r) => {
+    setups++;
+    ae('sc-btn', r).press(() => presses++);
+    return () => cleanups++;
+  });
+  assert(setups === 1, 'scope fn ran once for the existing root');
+  btn.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  assert(presses === 1, 'scoped press wired by scope fn works');
+  root.remove();
+  await tick();
+  assert(cleanups === 1, 'scope teardown runs when the root unmounts');
+  document.body.append(root);
+  await tick();
+  assert(setups === 2, 'remount re-runs the scope fn');
+  btn.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  assert(presses === 2, 'exactly one press after remount — no duplicate bindings');
+}
+
+// --- dynamic roots stamped by .list ------------------------------------------------
+{
+  const board = el(`<div data-ae="sc-board"><template><section data-ae="sc-col"><h3 data-ae="sc-title"></h3><button data-ae="sc-add"></button></section></template></div>`);
+  await tick();
+  const cols = ae.signal([{ id: 'a' }, { id: 'b' }]);
+  const clicks = [];
+  let setups = 0;
+  ae('sc-col').scope((colEl) => {
+    setups++;
+    ae('sc-add', colEl).press(() => clicks.push(colEl.dataset.id));
+  });
+  ae('sc-board').list(cols, (colEl, c) => {
+    colEl.dataset.id = c.id;
+    ae.parts(colEl)['sc-title'].textContent = c.id;
+  }, (c) => c.id);
+  await tick();
+  assert(setups === 2, 'scope fn ran once per stamped column');
+  const btnOf = (id) => board.querySelector(`[data-id="${id}"] [data-ae="sc-add"]`);
+  btnOf('a').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  btnOf('b').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  assert(clicks.join(',') === 'a,b', 'each column wired independently');
+  cols.value = [{ id: 'b' }, { id: 'a' }]; // reorder → render re-runs, nodes move
+  await tick();
+  assert(setups === 2, 'reorder (render re-run) does NOT re-run scope');
+  btnOf('a').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  assert(clicks.join(',') === 'a,b,a', 'still exactly one binding per button after reorder');
+  cols.value = [{ id: 'a' }];
+  await tick();
+  assert(board.querySelectorAll('[data-ae="sc-col"]').length === 1, 'removed column is gone');
+}
+
+// --- handles scoped to a DESCENDANT inside the fn are retired too -------------------
+{
+  const root = el('<div data-ae="sc-deep"><section><i data-ae="sc-leaf"></i></section></div>');
+  const section = root.querySelector('section');
+  await tick();
+  let runs = 0;
+  ae('sc-deep').scope(() => {
+    ae('sc-leaf', section).mount(() => { runs++; });
+  });
+  assert(runs === 1, 'descendant-scoped binding ran');
+  root.remove();
+  await tick();
+  document.body.append(root);
+  await tick();
+  assert(runs === 2, 'descendant-scoped map retired with the scope (no stacked duplicate)');
+}
+
+// --- pre-existing scoped maps survive an unrelated scope teardown -------------------
+{
+  const keeper = el('<div><b data-ae="sc-keep"></b></div>');
+  const other = el('<div data-ae="sc-other"></div>');
+  await tick();
+  const keepHandle = ae('sc-keep', keeper); // created OUTSIDE any scope
+  ae('sc-other').scope(() => {
+    ae('sc-keep', keeper); // touches the existing map from inside a scope
+  });
+  other.remove();
+  await tick();
+  assert(ae('sc-keep', keeper) === keepHandle, 'map created outside the scope is not retired by it');
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
