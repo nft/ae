@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ae bench — keyed list stress</title>
+  <style>
+    :root {
+      --bg: #0b0b0e;
+      --panel: #141419;
+      --border: rgba(255, 255, 255, 0.09);
+      --text: #ececf1;
+      --dim: #9a9aa3;
+      --accent: #0d9488;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem; }
+    .wrap { max-width: 1000px; margin: 0 auto; }
+    h1 { font-size: 1.3rem; margin-bottom: 1rem; }
+    h1 small { color: var(--dim); font-weight: 400; }
+    .controls { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    .controls button {
+      background: var(--panel); border: 1px solid var(--border); color: var(--text);
+      padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer;
+    }
+    .controls button:hover { border-color: var(--accent); }
+    .results { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+      padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem;
+      font-variant-numeric: tabular-nums; }
+    .results div { display: flex; justify-content: space-between; padding: 0.15rem 0; }
+    .results span:last-child { color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    td { padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border); }
+    td:first-child { color: var(--dim); width: 4rem; }
+    tr.sel td { background: rgba(13, 148, 136, 0.15); }
+    td a { color: var(--text); cursor: pointer; }
+    td button { background: none; border: none; color: var(--dim); cursor: pointer; }
+    td button:hover { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>ae bench <small>· keyed list stress · add <code>?auto</code> to run the suite</small></h1>
+
+    <div class="controls">
+      <button data-ae="b-create1k">Create 1,000</button>
+      <button data-ae="b-create10k">Create 10,000</button>
+      <button data-ae="b-append">Append 1,000</button>
+      <button data-ae="b-update">Update every 10th</button>
+      <button data-ae="b-select">Select row</button>
+      <button data-ae="b-swap">Swap rows</button>
+      <button data-ae="b-remove">Remove row</button>
+      <button data-ae="b-clear">Clear</button>
+    </div>
+
+    <div class="results" data-ae="results">
+      <template><div><span data-ae="r-name"></span><span data-ae="r-ms"></span></div></template>
+    </div>
+
+    <table>
+      <tbody data-ae="rows">
+        <template>
+          <tr>
+            <td data-ae="row-id"></td>
+            <td><a data-ae="row-label"></a></td>
+            <td><button data-ae="row-del">✕</button></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { ae } from '../dist/ae.js';
+
+    // --- deterministic row data (js-framework-benchmark style) --------------
+    const A = ['pretty', 'large', 'big', 'small', 'tall', 'short', 'long', 'handsome', 'plain', 'quaint', 'clean', 'elegant', 'easy', 'angry', 'crazy', 'helpful', 'mushy', 'odd', 'unsightly', 'adorable', 'important', 'inexpensive', 'cheap', 'expensive', 'fancy'];
+    const C = ['red', 'yellow', 'blue', 'green', 'pink', 'brown', 'purple', 'brown', 'white', 'black', 'orange'];
+    const N = ['table', 'chair', 'house', 'bbq', 'desk', 'car', 'pony', 'cookie', 'sandwich', 'burger', 'pizza', 'mouse', 'keyboard'];
+    let seed = 42;
+    const rand = (n) => (seed = (seed * 1664525 + 1013904223) >>> 0) % n;
+    let nextId = 1;
+    const build = (n) => Array.from({ length: n }, () => ({
+      id: nextId++,
+      label: `${A[rand(A.length)]} ${C[rand(C.length)]} ${N[rand(N.length)]}`,
+    }));
+
+    // --- state + bindings ----------------------------------------------------
+    const rows = ae.signal([]);
+    const selected = ae.signal(0);
+
+    ae('rows').list(rows, (tr, r) => {
+      const p = ae.parts(tr);
+      p['row-id'].textContent = r.id;
+      p['row-label'].textContent = r.label;
+      tr.classList.toggle('sel', selected.value === r.id);
+    }, (r) => r.id);
+
+    ae('row-label').press((a) => { selected.value = ae.itemOf(a).id; });
+    ae('row-del').press((btn) => {
+      const { id } = ae.itemOf(btn);
+      rows.value = rows.value.filter((r) => r.id !== id);
+    });
+
+    // --- operations ------------------------------------------------------------
+    const ops = {
+      create1k: () => { rows.value = build(1000); },
+      create10k: () => { rows.value = build(10000); },
+      append: () => { rows.value = [...rows.value, ...build(1000)]; },
+      update: () => {
+        rows.value = rows.value.map((r, i) => i % 10 === 0 ? { ...r, label: r.label + ' !!!' } : r);
+      },
+      select: () => { selected.value = rows.value[Math.floor(rows.value.length / 2)]?.id ?? 0; },
+      swap: () => {
+        if (rows.value.length < 999) return;
+        const next = [...rows.value];
+        [next[1], next[998]] = [next[998], next[1]];
+        rows.value = next;
+      },
+      remove: () => { rows.value = rows.value.filter((_, i) => i !== Math.floor(rows.value.length / 2)); },
+      clear: () => { rows.value = []; },
+    };
+
+    // --- measurement: signal write → flush → paint -----------------------------
+    const results = ae.signal([]);
+    ae('results').show(() => results.value.length > 0);
+    ae('results').list(results, (div, r) => {
+      const p = ae.parts(div);
+      p['r-name'].textContent = r.name;
+      p['r-ms'].textContent = `${r.ms.toFixed(1)} ms`;
+    }, (r) => r.name);
+
+    const tick = () => new Promise((r) => setTimeout(r, 0));
+    const paint = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    async function measure(name, op) {
+      const t0 = performance.now();
+      op();
+      await tick();     // microtask flush + MutationObserver mount pass
+      await paint();    // layout + paint committed
+      const ms = performance.now() - t0;
+      results.value = [...results.value.filter((r) => r.name !== name), { name, ms }];
+      return ms;
+    }
+
+    for (const [key, op] of Object.entries(ops)) {
+      ae(`b-${key}`).press(() => measure(key, op));
+    }
+
+    // --- auto suite (?auto): warm up, run everything, report --------------------
+    if (new URL(location.href).searchParams.has('auto')) {
+      (async () => {
+        for (let i = 0; i < 3; i++) { ops.create1k(); await tick(); ops.clear(); await tick(); }
+        await paint();
+
+        const out = {};
+        out['create 1k rows'] = await measure('create 1k rows', ops.create1k);
+        out['update every 10th (1k)'] = await measure('update every 10th (1k)', ops.update);
+        out['select row (1k)'] = await measure('select row (1k)', ops.select);
+        out['swap rows (1k)'] = await measure('swap rows (1k)', ops.swap);
+        out['remove row (1k)'] = await measure('remove row (1k)', ops.remove);
+        out['clear 1k rows'] = await measure('clear 1k rows', ops.clear);
+        out['create 10k rows'] = await measure('create 10k rows', ops.create10k);
+        out['append 1k to 10k'] = await measure('append 1k to 10k', ops.append);
+        out['update every 10th (11k)'] = await measure('update every 10th (11k)', ops.update);
+        out['swap rows (11k)'] = await measure('swap rows (11k)', ops.swap);
+        out['clear 11k rows'] = await measure('clear 11k rows', ops.clear);
+
+        document.title = 'ae bench — done';
+        try {
+          await fetch('/bench-result', { method: 'POST', body: JSON.stringify(out) });
+        } catch { /* manual run without a collector — results are on the page */ }
+      })();
+    }
+  </script>
+</body>
+</html>

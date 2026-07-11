@@ -74,6 +74,25 @@ per-list behavior without global name collisions.
 
 Full API and semantics: **[API.md](API.md)**. Live playground: `bun run serve` → `index.html`.
 
+## Performance
+
+Keyed-list stress numbers, measured **end-to-end** — signal write through
+reconciliation, mount pipeline, layout, and paint (headless Chrome, Apple
+M4 Max; median of 3 runs). Each row carries three live `data-ae` bindings,
+two of them event listeners.
+
+| operation | time |
+|---|---|
+| create 1,000 rows | 34 ms |
+| create 10,000 rows | 257 ms |
+| append 1,000 to 10,000 | 72 ms |
+| update every 10th of 11,000 | 142 ms |
+| swap 2 rows of 11,000 | 76 ms |
+| clear 11,000 rows | 50 ms |
+
+Reproduce: `bun run serve` → `examples/bench.html` (add `?auto` for the
+full suite).
+
 ## Development
 
 ```sh
