@@ -55,10 +55,10 @@
 
   <!-- ===== nav ===== -->
   <nav class="sticky top-0 z-10 border-b border-stone-200/70 bg-cream/85 backdrop-blur">
-    <div class="mx-auto flex max-w-5xl items-center gap-6 px-6 py-3.5">
+    <div class="mx-auto flex max-w-5xl items-baseline gap-6 px-6 py-3.5">
       <a href="#" class="font-display text-2xl font-semibold tracking-tight">ae</a>
       <span class="rounded-full border border-amber-700/25 bg-amber-700/5 px-2.5 py-0.5 font-mono text-[11px] text-amber-800">3.2 KB · zero deps</span>
-      <div class="ml-auto hidden items-center gap-6 text-sm text-stone-500 sm:flex">
+      <div class="ml-auto hidden items-baseline gap-6 text-sm text-stone-500 sm:flex">
         <a href="#cases" class="transition hover:text-ink">Cases</a>
         <a href="#docs" class="transition hover:text-ink">Docs</a>
         <a href="#guarantees" class="transition hover:text-ink">Guarantees</a>
@@ -479,7 +479,7 @@ ae('card').on('drop', (el, e) =>    // …and on a card:
 
   <!-- ===== footer ===== -->
   <footer class="border-t border-stone-200/70">
-    <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-10 text-sm text-stone-500">
+    <div class="mx-auto flex max-w-5xl flex-wrap items-baseline gap-x-6 gap-y-2 px-6 py-10 text-sm text-stone-500">
       <span class="font-display text-lg font-semibold text-ink">ae</span>
       <span>MIT license</span>
       <span>TypeScript</span>
@@ -488,8 +488,9 @@ ae('card').on('drop', (el, e) =>    // …and on a card:
     </div>
   </footer>
 
+  <script type="importmap">{ "imports": { "@aeroapp/ae": "./dist/ae.js" } }</script>
   <script type="module">
-    import { ae } from './dist/ae.js';
+    import { ae } from '@aeroapp/ae';
 
     // --- tiny highlighter for the code samples ------------------------------
     for (const el of document.querySelectorAll('code.hl')) {

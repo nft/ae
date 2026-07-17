@@ -1,0 +1,127 @@
+# ae (@aeroapp/ae) — compact API for AI agents
+
+Attribute-based DOM reactivity, 3.2 KB min+gzip, zero deps, ES module.
+HTML is the source of truth: write real markup, attach behavior by name.
+No virtual DOM, no hydration, no build step, no template syntax.
+
+```html
+<button data-ae="save">Save</button>
+<span data-ae="status"></span>
+<script type="module">
+  import { ae } from '@aeroapp/ae';
+  const saves = ae.signal(0);
+  ae('status').text(() => `saved ${saves.value}×`);
+  ae('save').press(() => saves.value++);
+</script>
+```
+
+Core model: `ae(name)` returns a cached, LIVE handle for every element with
+`data-ae="name"` — present or added later (one shared MutationObserver binds
+new elements and fully disposes removed ones: effects, listeners, cleanups).
+Never manually re-bind or unbind.
+
+## Signals
+
+- `ae.signal(v)` → `{ value }`. Writes batch per microtask; `Object.is`-equal
+  writes are no-ops. Three writes in one tick → one re-render.
+- `ae.computed(fn)` → read-only `{ value }`; lazy; notifies only when the
+  computed value actually changes.
+- `ae.effect(fn)` → auto-tracked side effect, runs immediately, returns
+  dispose function.
+- `ae.isSignal(v)` → true for signals/computeds.
+- `ae.settled()` → Promise; resolves when writes, list stamping, and mounts
+  have drained. Use in tests instead of setTimeout.
+
+## Handle methods (all chain, callbacks get the element first)
+
+- `.render(fn)` — run `fn(el)` per element, auto-tracking signal reads;
+  re-runs on change and for elements added later.
+- `.mount(fn)` — setup once per element; return a function to run as cleanup
+  on removal.
+- `.scope(fn)` — per-root setup that creates SCOPED handles (see below).
+- `.press(fn)` — activation: click, plus Enter/Space only for elements the
+  browser doesn't natively activate (no double-fire on real buttons).
+- `.hover(enter, leave?)` — pointerenter/pointerleave.
+- `.on(type, fn, opts?)` — any DOM event, per-element listener (non-bubbling
+  events work). Handler signature: `(el, event)`.
+- `.text(v)` `.cls(name, on?)` `.attr(name, v)` `.show(v)` — sugar; `v` may be
+  a plain value (applied once), a signal, or a function `(el) => value`
+  (both reactive). `.attr`: null/undefined/false removes, true sets empty.
+- `.input(signal)` — two-way form binding typed by field: text/textarea/select
+  ↔ Signal<string>, checkbox ↔ Signal<boolean>, number/range ↔ Signal<number>
+  via valueAsNumber (empty number field reads NaN — guard for it). Writes are
+  equality-guarded (caret never moves). Multiple fields on one signal mirror
+  each other. Radio groups / multi-select: use `.on` instead.
+- `.list(items, render, key?)` — keyed list stamping from the container's
+  native `<template>` (exactly one root element). `items`: signal/computed/
+  function of an array. `render(el, item, index)` runs in its own effect.
+  `key` defaults to item identity — pass `(item) => item.id`. Reorders MOVE
+  nodes (no remount); unchanged items don't re-render; removed items dispose.
+- `.els` — current matching elements (plain array). `.each(fn)` — one-shot
+  iteration, not reactive.
+
+## Lists: recovering the item in handlers
+
+`ae.itemOf(el)` → the `.list` item for the stamped node containing `el`
+(nearest stamped ancestor; nested lists resolve innermost). No key stamping
+in the DOM needed:
+
+```js
+ae('todos').list(todos, (li, todo) => {
+  ae.parts(li).title.textContent = todo.text;   // ae.parts: named descendants
+}, (t) => t.id);
+ae('remove').press((btn) => {
+  const todo = ae.itemOf(btn);
+  todos.value = todos.value.filter((t) => t.id !== todo.id);
+});
+```
+
+`ae.parts(root)` → `{ name: element }` for `data-ae` descendants of a stamped
+node (cached; static structure only).
+
+## Scoped handles — same names, private wiring
+
+`ae(name, root)` scopes a handle to descendants of `root`. For roots that can
+come and go (anything stamped by `.list`), create scoped handles inside
+`.scope`, which retires them on unmount so a remount rebuilds cleanly:
+
+```js
+ae('column').scope((colEl) => {
+  const colId = ae.itemOf(colEl).id;
+  const mine = ae.computed(() => cards.value.filter((c) => c.col === colId));
+  ae('cards', colEl).list(mine, renderCard, (c) => c.id);
+  ae('del', colEl).press((btn) => remove(ae.itemOf(btn).id));
+});
+```
+
+RULES: never create scoped handles inside a `.list` render callback (it
+re-runs → duplicate bindings); set up each root exactly once (that is what
+`.scope` guarantees).
+
+## Animation
+
+`ae.transition(fn)` — runs `fn` (signal writes) inside a View Transition;
+enters/exits/reorders animate via CSS `::view-transition-*`. Elements with a
+unique `style.viewTransitionName` MORPH, even across two `.list` containers.
+Unsupported browsers: `fn` just runs, returns undefined. Style
+`prefers-reduced-motion` yourself.
+
+## Guarantees
+
+Batching (one effect run per flush); absolute disposal (a disposed effect
+never runs again, even if queued); net-state lifecycle (moves don't remount,
+a→b→a renames are no-ops); fault isolation (one throwing binding never breaks
+the rest); runaway guard (self-triggering effects trip a breaker after 100
+cycles instead of hanging).
+
+## Gotchas
+
+- Writes flush on the NEXT microtask — `await ae.settled()` before asserting
+  on the DOM.
+- An item moved BETWEEN two `.list` containers is a remove + fresh stamp (new
+  node): transient DOM state (focus, scroll) doesn't travel. Use
+  `ae.transition` + `view-transition-name` to visually morph it.
+- `ae.parts` root itself is not a part; first match wins on duplicates.
+- Duplicate `.list` keys log an error and fall back to fresh nodes.
+
+Full prose spec: API.md in the repo (github.com/nft/ae).

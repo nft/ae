@@ -6,13 +6,27 @@ no hydration, no template syntax, no build step required.
 
 **3.2 KB** min+gzip · zero dependencies · TypeScript · one `data-ae` attribute
 
+## Install
+
+```sh
+bun add @aeroapp/ae     # or: npm i @aeroapp/ae
+```
+
+Or straight from a CDN, no tooling at all:
+
+```html
+<script type="module">
+  import { ae } from 'https://esm.sh/@aeroapp/ae';
+</script>
+```
+
 ```html
 <button data-ae="save">Save</button>
 <span data-ae="status"></span>
 ```
 
 ```js
-import { ae } from './dist/ae.js';
+import { ae } from '@aeroapp/ae';
 
 const count = ae.signal(0);
 
@@ -77,7 +91,9 @@ View Transition: list enters, exits, and reorders animate in pure CSS, and
 elements with a `view-transition-name` morph — even across lists. Falls back
 to a plain call where unsupported.
 
-Full API and semantics: **[API.md](API.md)**. Live playground: `bun run serve` → `index.html`.
+Full API and semantics: **[API.md](API.md)**. Compact API reference for AI
+agents: **[llms.txt](llms.txt)**. Live
+playground: `bun run serve` → `index.html`.
 
 Real app: **[examples/kanban.html](examples/kanban.html)** — a kanban with
 drag & drop, dynamic columns, inline editing, undo, filtering, and

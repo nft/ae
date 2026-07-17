@@ -105,8 +105,9 @@
     </template>
   </main>
 
+  <script type="importmap">{ "imports": { "@aeroapp/ae": "../dist/ae.js" } }</script>
   <script type="module">
-    import { ae } from '../dist/ae.js';
+    import { ae } from '@aeroapp/ae';
 
     const STORE = 'ae-kanban';
 

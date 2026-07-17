@@ -1,5 +1,5 @@
 {
-  "name": "ae",
+  "name": "@aeroapp/ae",
   "version": "0.4.0",
   "description": "Tiny attribute-based behavior + reactivity library. HTML is the source of truth: one data-ae attribute, signals, keyed lists, two-way forms, View-Transition animation. No virtual DOM, no hydration, no build step required.",
   "keywords": [
@@ -13,21 +13,34 @@
     "view-transitions"
   ],
   "license": "MIT",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nft/ae.git"
+  },
+  "homepage": "https://nft.github.io/ae/",
+  "bugs": "https://github.com/nft/ae/issues",
   "type": "module",
   "main": "dist/ae.js",
   "types": "dist/ae.d.ts",
   "exports": {
     ".": {
       "types": "./dist/ae.d.ts",
-      "import": "./dist/ae.js"
-    }
+      "import": "./dist/ae.js",
+      "default": "./dist/ae.js"
+    },
+    "./min": "./dist/ae.min.js"
   },
+  "unpkg": "dist/ae.min.js",
+  "jsdelivr": "dist/ae.min.js",
   "files": [
     "dist",
-    "src"
+    "src",
+    "llms.txt"
   ],
   "sideEffects": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",

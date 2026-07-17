@@ -13,7 +13,7 @@ the jsdom smoke suite, `npm run serve` hosts the demo at `index.html`.
 ```
 
 ```js
-import { ae } from './dist/ae.js';
+import { ae } from '@aeroapp/ae';
 
 const count = ae.signal(0);
 

@@ -71,8 +71,9 @@
     </table>
   </div>
 
+  <script type="importmap">{ "imports": { "@aeroapp/ae": "../dist/ae.js" } }</script>
   <script type="module">
-    import { ae } from '../dist/ae.js';
+    import { ae } from '@aeroapp/ae';
 
     // --- deterministic row data (js-framework-benchmark style) --------------
     const A = ['pretty', 'large', 'big', 'small', 'tall', 'short', 'long', 'handsome', 'plain', 'quaint', 'clean', 'elegant', 'easy', 'angry', 'crazy', 'helpful', 'mushy', 'odd', 'unsightly', 'adorable', 'important', 'inexpensive', 'cheap', 'expensive', 'fancy'];
