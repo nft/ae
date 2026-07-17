@@ -1,5 +1,9 @@
 # ae
 
+[![npm](https://img.shields.io/npm/v/%40aeroapp%2Fae?label=npm&color=b45309)](https://www.npmjs.com/package/@aeroapp/ae)
+[![CI](https://github.com/nft/ae/actions/workflows/ci.yml/badge.svg)](https://github.com/nft/ae/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-MIT-stone)](LICENSE)
+
 Tiny attribute-based behavior + reactivity library. **HTML is the source of
 truth** — you write real markup, `ae` attaches behavior to it. No virtual DOM,
 no hydration, no template syntax, no build step required.
