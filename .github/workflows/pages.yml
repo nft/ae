@@ -32,6 +32,7 @@ jobs:
           mkdir _site
           sed 's|\.\./|./|g' site/index.html > _site/index.html
           cp -R dist examples _site/
+          cp site/logo.svg _site/
           cp API.md README.md LICENSE llms.txt _site/
           touch _site/.nojekyll
 

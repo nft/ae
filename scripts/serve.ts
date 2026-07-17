@@ -6,7 +6,16 @@ Bun.serve({
   port,
   async fetch(req) {
     const url = new URL(req.url);
-    const path = url.pathname === '/' ? '/site/index.html' : url.pathname;
+    if (url.pathname === '/') {
+      return new Response('', {
+        status: 302,
+        headers: { Location: '/site/index.html' },
+      });
+    }
+    let path = url.pathname;
+    if (path === '/logo.svg') {
+      path = '/site/logo.svg';
+    }
     const file = Bun.file(`${import.meta.dir}/..${path}`);
     if (!(await file.exists())) return new Response('Not found', { status: 404 });
     return new Response(file);
