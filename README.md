@@ -95,8 +95,8 @@ elements with a `view-transition-name` morph — even across lists. Falls back
 to a plain call where unsupported.
 
 Full API and semantics: **[API.md](API.md)**. Compact API reference for AI
-agents: **[llms.txt](llms.txt)**. Live
-demos: `bun run serve` → http://localhost:4242.
+agents: **[llms.txt](llms.txt)**. Live demos: `bun run serve` →
+http://localhost:4242.
 
 Real app: **[examples/kanban.html](examples/kanban.html)** — a kanban with
 drag & drop, dynamic columns, inline editing, undo, filtering, and
