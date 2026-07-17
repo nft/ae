@@ -63,6 +63,7 @@
         <a href="#docs" class="transition hover:text-ink">Docs</a>
         <a href="#guarantees" class="transition hover:text-ink">Guarantees</a>
         <a href="#kanban" class="transition hover:text-ink">Kanban</a>
+        <a href="https://www.npmjs.com/package/@aeroapp/ae" class="transition hover:text-ink">npm</a>
         <a href="../API.md" class="rounded-lg border border-stone-300 px-3 py-1.5 font-medium text-stone-700 transition hover:border-amber-700 hover:text-amber-800">API.md</a>
       </div>
     </div>
@@ -84,7 +85,12 @@
         <a href="#cases" class="rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-cream transition hover:bg-amber-900">See it work</a>
         <a href="https://github.com/nft/ae" class="rounded-xl border border-stone-300 px-5 py-2.5 text-sm font-semibold text-stone-700 transition hover:border-amber-700 hover:text-amber-800">View on GitHub</a>
       </div>
-      <p class="mt-6 font-mono text-xs text-stone-400">Every demo on this page is live — the page itself runs on ae.</p>
+      <div class="mt-6 flex flex-wrap items-center gap-2 font-mono text-[12px] text-stone-700">
+        <code class="rounded-lg border border-stone-200 bg-white px-3 py-1.5">npm i <span class="text-amber-800">@aeroapp/ae</span></code>
+        <span class="text-stone-400">or one line, no tooling:</span>
+        <code class="rounded-lg border border-stone-200 bg-white px-3 py-1.5">import { ae } from <span class="text-amber-800">'https://esm.sh/@aeroapp/ae'</span></code>
+      </div>
+      <p class="mt-5 font-mono text-xs text-stone-400">Every demo on this page is live — the page itself runs on ae.</p>
     </div>
 
     <div class="rounded-2xl border border-stone-200 bg-white shadow-[0_20px_50px_-30px_rgba(120,72,20,0.35)]">
@@ -484,6 +490,9 @@ ae('card').on('drop', (el, e) =>    // …and on a card:
       <span>MIT license</span>
       <span>TypeScript</span>
       <span>3.2 KB min+gzip</span>
+      <a href="https://www.npmjs.com/package/@aeroapp/ae" class="transition hover:text-ink">npm</a>
+      <a href="https://esm.sh/@aeroapp/ae" class="transition hover:text-ink">esm.sh</a>
+      <a href="https://cdn.jsdelivr.net/npm/@aeroapp/ae/+esm" class="transition hover:text-ink">jsDelivr</a>
       <span class="ml-auto">This page runs on ae — view source.</span>
     </div>
   </footer>

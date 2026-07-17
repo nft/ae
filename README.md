@@ -19,13 +19,18 @@ pnpm add @aeroapp/ae
 bun add @aeroapp/ae
 ```
 
-Or straight from a CDN, no tooling at all:
+Or straight from a CDN, no tooling at all — esm.sh, unpkg, and jsDelivr all
+serve it the moment you need it:
 
 ```html
 <script type="module">
   import { ae } from 'https://esm.sh/@aeroapp/ae';
+  // or: 'https://unpkg.com/@aeroapp/ae'                  (minified build)
+  // or: 'https://cdn.jsdelivr.net/npm/@aeroapp/ae/+esm'
 </script>
 ```
+
+Pin a version in production, e.g. `https://esm.sh/@aeroapp/ae@0.4.0`.
 
 ```html
 <button data-ae="save">Save</button>
