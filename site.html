@@ -41,6 +41,14 @@
     @media (prefers-reduced-motion: reduce) {
       ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
     }
+
+    /* kanban demo */
+    [data-ae="k-cards"].k-drop { outline: 2px dashed #b45309; outline-offset: 4px; }
+    [data-ae="k-card"].k-ins-top { box-shadow: 0 -3px 0 0 #b45309; }
+    [data-ae="k-card"].k-ins-bottom { box-shadow: 0 3px 0 0 #b45309; }
+    [data-ae="k-card"][data-prio="0"] [data-ae="k-prio"] { color: #d6d3d1; }
+    [data-ae="k-card"][data-prio="1"] [data-ae="k-prio"] { color: #d97706; }
+    [data-ae="k-card"][data-prio="2"] [data-ae="k-prio"] { color: #dc2626; }
   </style>
 </head>
 <body class="bg-cream font-sans text-ink antialiased">
@@ -54,7 +62,7 @@
         <a href="#cases" class="transition hover:text-ink">Cases</a>
         <a href="#docs" class="transition hover:text-ink">Docs</a>
         <a href="#guarantees" class="transition hover:text-ink">Guarantees</a>
-        <a href="examples/kanban.html" class="transition hover:text-ink">Kanban</a>
+        <a href="#kanban" class="transition hover:text-ink">Kanban</a>
         <a href="API.md" class="rounded-lg border border-stone-300 px-3 py-1.5 font-medium text-stone-700 transition hover:border-amber-700 hover:text-amber-800">API.md</a>
       </div>
     </div>
@@ -171,13 +179,14 @@ ae('plus3').press(() => {
         <p class="mt-4 leading-relaxed text-stone-600">
           <code class="font-mono text-[15px]">.list()</code> stamps the container's
           <code class="font-mono text-[15px]">&lt;template&gt;</code> per item with keyed reconciliation.
-          Shuffle <em>moves</em> nodes — the mount times survive, proving nothing remounts. And handlers
-          recover their item with <code class="font-mono text-[15px]">ae.itemOf</code>: no keys stamped
-          into the DOM.
+          Shuffle <em>moves</em> nodes — each row's stable <span class="font-mono text-[13px] text-amber-800">#id</span>
+          and mount time travel with it, proving nothing remounts. And handlers recover their item with
+          <code class="font-mono text-[15px]">ae.itemOf</code>: no keys stamped into the DOM.
         </p>
-        <pre class="mt-6 overflow-x-auto rounded-xl bg-stone-900 p-5 text-[13px] leading-relaxed text-stone-200"><code class="hl">ae('todos').list(todos, (li, todo, i) => {
+        <pre class="mt-6 overflow-x-auto rounded-xl bg-stone-900 p-5 text-[13px] leading-relaxed text-stone-200"><code class="hl">ae('todos').list(todos, (li, todo) => {
   const p = ae.parts(li);
-  p.title.textContent = `${i + 1}. ${todo.text}`;
+  p.id.textContent = `#${todo.id}`;   // stable key
+  p.title.textContent = todo.text;
 }, (todo) => todo.id);
 
 ae('remove').press((btn) => {
@@ -195,6 +204,7 @@ ae('remove').press((btn) => {
           <p data-ae="d2-empty" class="rounded-xl border border-dashed border-stone-300 py-6 text-center text-sm text-stone-400">Nothing left — add one above.</p>
           <template>
             <div class="flex items-center gap-3 rounded-xl bg-stone-100/80 px-4 py-2.5">
+              <span data-ae="d2-id" class="w-7 shrink-0 font-mono text-[11px] text-stone-400"></span>
               <span data-ae="d2-title" class="flex-1 text-sm font-medium"></span>
               <span data-ae="d2-when" class="font-mono text-[11px] text-amber-700"></span>
               <button data-ae="d2-remove" class="text-sm text-stone-400 transition hover:text-red-600">✕</button>
@@ -210,32 +220,42 @@ ae('remove').press((btn) => {
         <span class="font-mono text-[11px] uppercase tracking-widest text-amber-700">.input</span>
         <h2 class="mt-3 font-display text-3xl font-medium tracking-tight">Forms that stay in type</h2>
         <p class="mt-4 leading-relaxed text-stone-600">
-          <code class="font-mono text-[15px]">.input(signal)</code> wires by field type — strings for
-          text, booleans for checkboxes, <strong class="text-ink">real numbers</strong> for range and
-          number inputs. The two volume fields below share one signal; writes are equality-guarded, so
-          echoes never move your caret.
+          <code class="font-mono text-[15px]">.input(signal)</code> wires by field type — a
+          <code class="font-mono text-[15px]">&lt;select&gt;</code> speaks strings, checkboxes speak
+          booleans, number and range fields speak <strong class="text-ink">real numbers</strong>. The
+          two seat fields share one signal, so the total is plain arithmetic on signal values — no
+          <code class="font-mono text-[15px]">parseInt</code>, no string math, and equality-guarded
+          writes mean echoes never move your caret.
         </p>
-        <pre class="mt-6 overflow-x-auto rounded-xl bg-stone-900 p-5 text-[13px] leading-relaxed text-stone-200"><code class="hl">const name = ae.signal('');
-const volume = ae.signal(40);   // Signal&lt;number&gt;
-const loud = ae.signal(false);  // Signal&lt;boolean&gt;
+        <pre class="mt-6 overflow-x-auto rounded-xl bg-stone-900 p-5 text-[13px] leading-relaxed text-stone-200"><code class="hl">const plan = ae.signal('pro');     // &lt;select&gt; ↔ string
+const seats = ae.signal(3);        // number + range share it
+const yearly = ae.signal(false);   // checkbox ↔ boolean
 
-ae('name').input(name);
-ae('volume').input(volume);     // range + number
-ae('loud').input(loud);</code></pre>
+ae('plan').input(plan);
+ae('seats').input(seats);          // both fields, one signal
+ae('yearly').input(yearly);
+
+ae('total').text(() =>             // arithmetic, no parseInt
+  `$${PRICE[plan.value] * seats.value
+      * (yearly.value ? 10 : 12)}/yr`);</code></pre>
       </div>
       <div class="rounded-2xl border border-stone-200 bg-white p-6 md:mt-14">
         <div class="grid gap-4 sm:grid-cols-2">
-          <label class="text-xs font-medium text-stone-500">Name
-            <input data-ae="d3-name" placeholder="Your name" class="demo-field mt-1.5 w-full">
+          <label class="text-xs font-medium text-stone-500">Plan
+            <select data-ae="d3-plan" class="demo-field mt-1.5 w-full">
+              <option value="hobby">Hobby — $9/seat</option>
+              <option value="pro">Pro — $24/seat</option>
+              <option value="scale">Scale — $49/seat</option>
+            </select>
           </label>
-          <label class="text-xs font-medium text-stone-500">Volume (number)
-            <input data-ae="d3-vol" type="number" min="0" max="100" class="demo-field mt-1.5 w-full">
+          <label class="text-xs font-medium text-stone-500">Seats (number)
+            <input data-ae="d3-seats" type="number" min="1" max="50" class="demo-field mt-1.5 w-full">
           </label>
-          <label class="text-xs font-medium text-stone-500 sm:col-span-2">Volume (range — same signal)
-            <input data-ae="d3-vol" type="range" min="0" max="100" class="mt-2 w-full accent-amber-700">
+          <label class="text-xs font-medium text-stone-500 sm:col-span-2">Seats (range — same signal)
+            <input data-ae="d3-seats" type="range" min="1" max="50" class="mt-2 w-full accent-amber-700">
           </label>
           <label class="flex items-center gap-2 text-sm text-stone-600 sm:col-span-2">
-            <input data-ae="d3-loud" type="checkbox" class="h-4 w-4 accent-amber-700"> Extra loud
+            <input data-ae="d3-yearly" type="checkbox" class="h-4 w-4 accent-amber-700"> Bill yearly — two months free
           </label>
         </div>
         <p data-ae="d3-preview" class="mt-5 rounded-xl bg-amber-700/5 px-4 py-3 text-center font-display text-lg text-amber-900"></p>
@@ -306,6 +326,79 @@ ae('mix').press(() => ae.transition(() => {
           <template><span data-ae="d5-chip"></span></template>
         </div>
         <p class="mt-4 font-mono text-[11px] text-stone-400">Chrome 111+ / Safari 18+ animate the morphs; elsewhere it's instant.</p>
+      </div>
+    </section>
+
+    <!-- case 6: kanban — everything composed -->
+    <section id="kanban" class="scroll-mt-20">
+      <div class="grid items-start gap-10 md:grid-cols-2">
+        <div>
+          <span class="font-mono text-[11px] uppercase tracking-widest text-amber-700">.list × .scope × ae.itemOf × ae.transition</span>
+          <h2 class="mt-3 font-display text-3xl font-medium tracking-tight">All of it at once: kanban</h2>
+          <p class="mt-4 leading-relaxed text-stone-600">
+            Columns are a keyed list; each column's cards are <em>another</em> keyed list, wired per
+            column by <code class="font-mono text-[15px]">.scope()</code> with identical inner names
+            that never collide. Drag a card between columns —
+            <code class="font-mono text-[15px]">ae.itemOf</code> resolves the card on the source and
+            the <em>column</em> on the drop target. Drop onto another <em>card</em> and the same call
+            resolves that card instead, so vertical reordering falls out for free. Every mutation
+            morphs via <code class="font-mono text-[15px]">ae.transition</code>; undo is just a
+            snapshot of two signals.
+          </p>
+          <p class="mt-4 text-sm text-stone-500">
+            Want it full-screen, with persistence and inline editing?
+            <a href="examples/kanban.html" class="font-medium text-amber-800 underline decoration-amber-700/30 underline-offset-4 hover:decoration-amber-700">Open the standalone board →</a>
+          </p>
+        </div>
+        <pre class="overflow-x-auto rounded-xl bg-stone-900 p-5 text-[13px] leading-relaxed text-stone-200 md:mt-14"><code class="hl">ae('board').list(cols, renderCol, (c) => c.id);
+
+ae('column').scope((colEl) => {     // once per column
+  const colId = ae.itemOf(colEl).id;
+  const mine = ae.computed(() =>
+    cards.value.filter((c) => c.col === colId));
+
+  ae('cards', colEl).list(mine, renderCard, (c) => c.id);
+});
+
+ae('cards').on('drop', (el, e) => { // itemOf on the target
+  patch(dragging, { col: ae.itemOf(el).id });
+});
+
+ae('card').on('drop', (el, e) =>    // …and on a card:
+  reorder(dragging, ae.itemOf(el), isBelow(el, e)));</code></pre>
+      </div>
+
+      <div class="mt-10 rounded-2xl border border-stone-200 bg-white p-6">
+        <div class="flex flex-wrap items-center gap-2">
+          <input data-ae="k-new" placeholder="New card — Enter adds to first column" class="demo-field min-w-0 flex-1">
+          <button data-ae="k-add-col" class="demo-btn">+ column</button>
+          <button data-ae="k-undo" class="demo-btn disabled:opacity-40" title="Undo">↩ undo <b data-ae="k-undo-count" class="text-amber-800"></b></button>
+          <span data-ae="k-stats" class="w-full font-mono text-[11px] text-stone-400 sm:ml-auto sm:w-auto"></span>
+        </div>
+        <div data-ae="k-board" class="mt-4 grid auto-cols-[minmax(230px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2">
+          <template>
+            <section data-ae="k-column" class="rounded-xl border border-stone-200 bg-stone-100/60 p-3">
+              <h3 class="flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest">
+                <span data-ae="k-col-name" class="flex-1 text-stone-500"></span>
+                <b data-ae="k-col-count" class="text-amber-800"></b>
+                <button data-ae="k-col-del" class="text-stone-400 transition hover:text-red-600 disabled:opacity-30" title="Delete column (cards move over)">✕</button>
+              </h3>
+              <div data-ae="k-cards" class="mt-3 flex min-h-[64px] flex-col gap-2 rounded-lg">
+                <p data-ae="k-col-empty" class="rounded-lg border border-dashed border-stone-300 py-4 text-center text-xs text-stone-400">empty</p>
+                <template>
+                  <article data-ae="k-card" draggable="true" class="flex cursor-grab items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-sm shadow-sm">
+                    <button data-ae="k-prio" class="px-0.5" title="Cycle priority">●</button>
+                    <span data-ae="k-title" class="flex-1 font-medium [overflow-wrap:anywhere]"></span>
+                    <button data-ae="k-left" class="rounded px-1 text-xs text-stone-400 transition hover:text-ink" title="Move left">◀</button>
+                    <button data-ae="k-right" class="rounded px-1 text-xs text-stone-400 transition hover:text-ink" title="Move right">▶</button>
+                    <button data-ae="k-del" class="rounded px-1 text-xs text-stone-400 transition hover:text-red-600" title="Delete">✕</button>
+                  </article>
+                </template>
+              </div>
+            </section>
+          </template>
+        </div>
+        <p class="mt-3 font-mono text-[11px] text-stone-400">Drag cards between columns, or onto a card to reorder · click ● to cycle priority · every move is a View Transition.</p>
       </div>
     </section>
   </main>
@@ -448,8 +541,10 @@ ae('mix').press(() => ae.transition(() => {
     ae('d2-add').press(addTodo);
     ae('d2-shuffle').press(() => { todos.value = [...todos.value].sort(() => Math.random() - 0.5); });
 
-    ae('d2-list').list(todos, (li, todo, i) => {
-      ae.parts(li)['d2-title'].textContent = `${i + 1}. ${todo.text}`;
+    ae('d2-list').list(todos, (li, todo) => {
+      const p = ae.parts(li);
+      p['d2-id'].textContent = `#${todo.id}`;
+      p['d2-title'].textContent = todo.text;
     }, (todo) => todo.id);
 
     ae('d2-empty').show(() => todos.value.length === 0);
@@ -466,18 +561,20 @@ ae('mix').press(() => ae.transition(() => {
     });
 
     // --- case 3: two-way forms --------------------------------------------------
-    const fName = ae.signal('');
-    const fVolume = ae.signal(40);
-    const fLoud = ae.signal(false);
+    const PRICE = { hobby: 9, pro: 24, scale: 49 };
+    const fPlan = ae.signal('pro');
+    const fSeats = ae.signal(3);
+    const fYearly = ae.signal(false);
 
-    ae('d3-name').input(fName);
-    ae('d3-vol').input(fVolume);
-    ae('d3-loud').input(fLoud);
+    ae('d3-plan').input(fPlan);
+    ae('d3-seats').input(fSeats);
+    ae('d3-yearly').input(fYearly);
 
     ae('d3-preview').text(() => {
-      const who = fName.value.trim() || 'Somebody';
-      const vol = Number.isNaN(fVolume.value) ? 0 : fVolume.value;
-      return `${who} is listening at volume ${vol}${fLoud.value ? ' 🔊' : ''}`;
+      const seats = Number.isNaN(fSeats.value) ? 0 : fSeats.value;
+      const total = PRICE[fPlan.value] * seats * (fYearly.value ? 10 : 12);
+      const plan = fPlan.value[0].toUpperCase() + fPlan.value.slice(1);
+      return `${plan} · ${seats} ${seats === 1 ? 'seat' : 'seats'} · $${total.toLocaleString('en-US')}/yr${fYearly.value ? ' — two months free' : ''}`;
     });
 
     // --- case 4: scoped widgets ---------------------------------------------------
@@ -529,6 +626,167 @@ ae('mix').press(() => ae.transition(() => {
     ae('d5-remove').press(() => ae.transition(() => {
       chips.value = chips.value.slice(0, -1);
     }));
+
+    // --- case 6: kanban — everything composed --------------------------------
+    const kCols = ae.signal([
+      { id: 'backlog', name: 'Backlog' },
+      { id: 'doing', name: 'In progress' },
+      { id: 'done', name: 'Done' },
+    ]);
+    const kCards = ae.signal([
+      { id: 1, title: 'Write real HTML', col: 'done', prio: 0 },
+      { id: 2, title: 'Add one attribute', col: 'doing', prio: 2 },
+      { id: 3, title: 'Nest two keyed lists', col: 'doing', prio: 1 },
+      { id: 4, title: 'Ship it', col: 'backlog', prio: 0 },
+    ]);
+    let kSeq = kCards.value.length;
+    let kColSeq = kCols.value.length;
+
+    // Undo: snapshot both signals before every mutation; commit() also wraps
+    // the write in ae.transition so moves, drops, deletes, and undo all morph.
+    const kHistory = ae.signal([]);
+    const kCommit = (fn) => {
+      kHistory.value = [...kHistory.value.slice(-49), { cols: kCols.value, cards: kCards.value }];
+      ae.transition(fn);
+    };
+    ae('k-undo')
+      .attr('disabled', () => kHistory.value.length === 0)
+      .press(() => {
+        const h = kHistory.value;
+        if (!h.length) return;
+        kHistory.value = h.slice(0, -1);
+        ae.transition(() => {
+          kCols.value = h[h.length - 1].cols;
+          kCards.value = h[h.length - 1].cards;
+        });
+      });
+    ae('k-undo-count').text(() => kHistory.value.length || '');
+    ae('k-stats').text(() => `${kCards.value.length} cards · ${kCols.value.length} columns`);
+
+    const kPatch = (id, delta) => kCommit(() => {
+      kCards.value = kCards.value.map((c) => c.id === id ? { ...c, ...delta } : c);
+    });
+    const kMove = (id, dir) => {
+      const card = kCards.value.find((c) => c.id === id);
+      const next = kCols.value[kCols.value.findIndex((c) => c.id === card.col) + dir];
+      if (next) kPatch(id, { col: next.id });
+    };
+
+    const kDraft = ae.signal('');
+    ae('k-new').input(kDraft).on('keydown', (el, e) => {
+      if (e.key !== 'Enter') return;
+      const title = kDraft.value.trim();
+      if (!title) return;
+      kCommit(() => { kCards.value = [...kCards.value, { id: ++kSeq, title, col: kCols.value[0].id, prio: 0 }]; });
+      kDraft.value = '';
+    });
+    ae('k-add-col').press(() => kCommit(() => {
+      kCols.value = [...kCols.value, { id: `col-${++kColSeq}`, name: `Column ${kCols.value.length + 1}` }];
+    }));
+
+    // Columns are themselves a keyed list — the board is fully dynamic.
+    ae('k-board').list(kCols, (colEl, c) => {
+      ae.parts(colEl)['k-col-name'].textContent = c.name;
+      colEl.style.viewTransitionName = `kcol-${c.id}`;
+    }, (c) => c.id);
+
+    // Per-column wiring: .scope() runs once per stamped column root, so the
+    // identical inner names below never collide across columns.
+    ae('k-column').scope((colEl) => {
+      const colId = ae.itemOf(colEl).id;               // outer list item = the column
+      const idx = () => kCols.value.findIndex((c) => c.id === colId);
+      const colCards = ae.computed(() => kCards.value.filter((c) => c.col === colId));
+
+      ae('k-cards', colEl).list(colCards, (card, c) => {
+        ae.parts(card)['k-title'].textContent = c.title;
+        card.dataset.prio = c.prio;
+        // Unique name per card: cross-column moves MORPH between the old and
+        // new node, even though underneath it's a remount in another list.
+        card.style.viewTransitionName = `kcard-${c.id}`;
+      }, (c) => c.id);
+
+      ae('k-col-count', colEl).text(() => colCards.value.length);
+      ae('k-col-empty', colEl).show(() => colCards.value.length === 0);
+      ae('k-col-del', colEl)
+        .attr('disabled', () => kCols.value.length <= 1)
+        .press(() => kCommit(() => {
+          const target = kCols.value[idx() - 1] ?? kCols.value[idx() + 1];
+          if (!target) return;
+          kCols.value = kCols.value.filter((c) => c.id !== colId);
+          kCards.value = kCards.value.map((c) => c.col === colId ? { ...c, col: target.id } : c);
+        }));
+
+      // Edge arrows follow the *live* column order.
+      ae('k-left', colEl).show(() => idx() > 0).press((btn) => kMove(ae.itemOf(btn).id, -1));
+      ae('k-right', colEl).show(() => idx() < kCols.value.length - 1).press((btn) => kMove(ae.itemOf(btn).id, +1));
+      ae('k-del', colEl).press((btn) => {
+        const { id } = ae.itemOf(btn);
+        kCommit(() => { kCards.value = kCards.value.filter((c) => c.id !== id); });
+      });
+    });
+
+    // Behaviors identical in every column stay global.
+    ae('k-prio').press((btn) => {
+      const c = ae.itemOf(btn);
+      kPatch(c.id, { prio: (c.prio + 1) % 3 });
+    });
+
+    // Drag & drop: itemOf resolves the card on the source and — because the
+    // drop target sits inside a column stamped by the *board* list — the
+    // column on the target. Cards are drop targets too: landing on a card's
+    // top half inserts before it, bottom half after, so the same drag
+    // reorders vertically within a column (and positions cross-column drops).
+    let kDragging = null;
+    const kClearDrop = () => {
+      ae('k-cards').each((el) => el.classList.remove('k-drop'));
+      ae('k-card').each((el) => el.classList.remove('k-ins-top', 'k-ins-bottom'));
+    };
+    const kIsBelow = (el, e) => e.clientY - el.getBoundingClientRect().top > el.offsetHeight / 2;
+    const kReorder = (dragId, target, after) => {
+      if (dragId == null || target == null || dragId === target.id) return;
+      const cur = kCards.value;
+      const dragged = cur.find((c) => c.id === dragId);
+      const rest = cur.filter((c) => c.id !== dragId);
+      const i = rest.findIndex((c) => c.id === target.id);
+      if (!dragged || i < 0) return;
+      const at = i + (after ? 1 : 0);
+      const moved = dragged.col === target.col ? dragged : { ...dragged, col: target.col };
+      const next = [...rest.slice(0, at), moved, ...rest.slice(at)];
+      if (next.every((c, j) => c === cur[j])) return;   // dropped where it already sits
+      kCommit(() => { kCards.value = next; });
+    };
+    ae('k-card')
+      .on('dragstart', (el) => { kDragging = ae.itemOf(el).id; })
+      .on('dragend', () => { kDragging = null; kClearDrop(); })
+      .on('dragover', (el, e) => {
+        e.preventDefault();
+        e.stopPropagation();                             // suppress the column outline
+        if (kDragging == null || ae.itemOf(el).id === kDragging) return;
+        const below = kIsBelow(el, e);
+        el.classList.toggle('k-ins-top', !below);
+        el.classList.toggle('k-ins-bottom', below);
+      })
+      .on('dragleave', (el) => el.classList.remove('k-ins-top', 'k-ins-bottom'))
+      .on('drop', (el, e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const target = ae.itemOf(el);
+        const below = kIsBelow(el, e);
+        kClearDrop();
+        kReorder(kDragging, target, below);
+        kDragging = null;
+      });
+    ae('k-cards')
+      .on('dragover', (el, e) => { e.preventDefault(); el.classList.add('k-drop'); })
+      .on('dragleave', (el) => el.classList.remove('k-drop'))
+      .on('drop', (el, e) => {
+        e.preventDefault();
+        kClearDrop();
+        const target = ae.itemOf(el);                  // the column this container lives in
+        const card = kCards.value.find((c) => c.id === kDragging);
+        if (card && target && card.col !== target.id) kPatch(card.id, { col: target.id });
+        kDragging = null;
+      });
   </script>
 </body>
 </html>
