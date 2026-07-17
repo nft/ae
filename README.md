@@ -98,7 +98,7 @@ playground: `bun run serve` → `index.html`.
 Real app: **[examples/kanban.html](examples/kanban.html)** — a kanban with
 drag & drop, dynamic columns, inline editing, undo, filtering, and
 localStorage persistence in ~170 lines of JS. One-pager with live demos:
-**[site.html](site.html)**.
+**[site/index.html](site/index.html)** (deployed to GitHub Pages).
 
 ## Performance
 
