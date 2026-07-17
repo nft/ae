@@ -1,0 +1,45 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build && bun run min
+
+      # site.html becomes the site root; the playground keeps its links working
+      # under the name playground.html.
+      - name: Assemble site
+        run: |
+          mkdir _site
+          sed 's|href="index.html"|href="playground.html"|g' site.html > _site/index.html
+          cp index.html _site/playground.html
+          cp -R dist examples _site/
+          cp API.md README.md LICENSE llms.txt _site/
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
