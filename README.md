@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="site/logo.svg" alt="ae logo" width="180" />
+</p>
+
 # ae
 
 [![npm](https://img.shields.io/npm/v/%40aeroapp%2Fae?label=npm&color=b45309)](https://www.npmjs.com/package/@aeroapp/ae)
