@@ -9,7 +9,10 @@ no hydration, no template syntax, no build step required.
 ## Install
 
 ```sh
-bun add @aeroapp/ae     # or: npm i @aeroapp/ae
+npm install @aeroapp/ae
+yarn add @aeroapp/ae
+pnpm add @aeroapp/ae
+bun add @aeroapp/ae
 ```
 
 Or straight from a CDN, no tooling at all:
