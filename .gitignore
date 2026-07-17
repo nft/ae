@@ -18,3 +18,5 @@ npm-debug.log*
 # Editor
 .vscode/
 .idea/
+
+tmp/
