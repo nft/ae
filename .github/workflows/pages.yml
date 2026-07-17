@@ -26,13 +26,11 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build && bun run min
 
-      # site/index.html becomes the site root: its ../ asset paths flatten to
-      # ./ and the playground is served next to it as playground.html.
+      # site/index.html becomes the site root: its ../ asset paths flatten to ./
       - name: Assemble site
         run: |
           mkdir _site
-          sed -e 's|href="\.\./index.html"|href="playground.html"|g' -e 's|\.\./||g' site/index.html > _site/index.html
-          cp index.html _site/playground.html
+          sed 's|\.\./||g' site/index.html > _site/index.html
           cp -R dist examples _site/
           cp API.md README.md LICENSE llms.txt _site/
           touch _site/.nojekyll

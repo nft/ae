@@ -5,7 +5,7 @@ HTML is the source of truth, `ae` attaches behavior to it.
 
 Written in TypeScript (`src/ae.ts`), ships as an ES module with type
 declarations. `npm run build` → `dist/ae.js` + `dist/ae.d.ts`, `npm test` runs
-the jsdom smoke suite, `npm run serve` hosts the demo at `index.html`.
+the jsdom smoke suite, `npm run serve` hosts the site at `site/index.html`.
 
 ```html
 <button data-ae="save">Save</button>
