@@ -52,7 +52,7 @@
     [data-ae="k-card"][data-prio="2"] [data-ae="k-prio"] { color: #dc2626; }
   </style>
 </head>
-<body class="bg-cream font-sans text-ink antialiased">
+<body class="overflow-x-clip bg-cream font-sans text-ink antialiased">
 
   <!-- ===== nav ===== -->
   <nav class="sticky top-0 z-10 border-b border-stone-200/70 bg-cream/85 backdrop-blur">
@@ -123,9 +123,9 @@
         <a href="https://github.com/nft/ae" class="rounded-xl border border-stone-300 px-5 py-2.5 text-sm font-semibold text-stone-700 transition hover:border-amber-700 hover:text-amber-800">View on GitHub</a>
       </div>
       <div class="mt-6 flex flex-wrap items-center gap-2 font-mono text-[12px] text-stone-700">
-        <code class="rounded-lg border border-stone-200 bg-white px-3 py-1.5">npm i <span class="text-amber-800">@aeroapp/ae</span></code>
+        <code class="max-w-full overflow-x-auto whitespace-nowrap rounded-lg border border-stone-200 bg-white px-3 py-1.5">npm i <span class="text-amber-800">@aeroapp/ae</span></code>
         <span class="text-stone-400">or one line, no tooling:</span>
-        <code class="rounded-lg border border-stone-200 bg-white px-3 py-1.5">import { ae } from <span class="text-amber-800">'https://esm.sh/@aeroapp/ae'</span></code>
+        <code class="max-w-full overflow-x-auto whitespace-nowrap rounded-lg border border-stone-200 bg-white px-3 py-1.5">import { ae } from <span class="text-amber-800">'https://esm.sh/@aeroapp/ae'</span></code>
       </div>
       <p class="mt-5 font-mono text-xs text-stone-400">Every demo on this page is live — the page itself runs on ae.</p>
     </div>
@@ -238,8 +238,8 @@ ae('remove').press((btn) => {
 });</code></pre>
       </div>
       <div class="rounded-2xl border border-stone-200 bg-white p-6 md:order-1 md:mt-14">
-        <div class="flex gap-2">
-          <input data-ae="d2-draft" placeholder="New item…" class="demo-field min-w-0 flex-1">
+        <div class="flex flex-wrap gap-2">
+          <input data-ae="d2-draft" placeholder="New item…" class="demo-field w-full flex-none min-w-0 sm:w-auto sm:flex-1">
           <button data-ae="d2-add" class="demo-btn">Add</button>
           <button data-ae="d2-shuffle" class="demo-btn">Shuffle</button>
         </div>
@@ -413,7 +413,7 @@ ae('card').on('drop', (el, e) =>    // …and on a card:
 
       <div class="mt-10 rounded-2xl border border-stone-200 bg-white p-6">
         <div class="flex flex-wrap items-center gap-2">
-          <input data-ae="k-new" placeholder="New card — Enter adds to first column" class="demo-field min-w-0 flex-1">
+          <input data-ae="k-new" placeholder="New card — Enter adds to first column" class="demo-field w-full flex-none min-w-0 sm:w-auto sm:flex-1">
           <button data-ae="k-add-col" class="demo-btn">+ column</button>
           <button data-ae="k-undo" class="demo-btn disabled:opacity-40" title="Undo">↩ undo <b data-ae="k-undo-count" class="text-amber-800"></b></button>
           <span data-ae="k-stats" class="w-full font-mono text-[11px] text-stone-400 sm:ml-auto sm:w-auto"></span>
@@ -459,29 +459,29 @@ ae('card').on('drop', (el, e) =>    // …and on a card:
         <div>
           <h3 class="font-mono text-xs uppercase tracking-widest text-stone-400">Global</h3>
           <dl class="mt-4 space-y-3 text-sm">
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae(name)</dt><dd class="text-stone-600">live handle for every <code class="font-mono text-[12px]">data-ae="name"</code>, present or future</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae(name, root)</dt><dd class="text-stone-600">same, scoped to descendants of <code class="font-mono text-[12px]">root</code></dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.signal(v)</dt><dd class="text-stone-600">reactive value; writes batch per microtask</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.computed(fn)</dt><dd class="text-stone-600">lazy derived value; notifies only on real change</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.effect(fn)</dt><dd class="text-stone-600">auto-tracked side effect; returns dispose</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.parts(root)</dt><dd class="text-stone-600">named <code class="font-mono text-[12px]">data-ae</code> descendants of a stamped node</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.itemOf(el)</dt><dd class="text-stone-600">the current list item an element belongs to</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.transition(fn)</dt><dd class="text-stone-600">run writes inside a View Transition; enters, exits, and moves animate in CSS</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.settled()</dt><dd class="text-stone-600">resolves when writes and mounts have drained</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">ae.isSignal(v)</dt><dd class="text-stone-600">true for signals and computeds</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">ae(name)</dt><dd class="text-stone-600">live handle for every <code class="font-mono text-[12px]">data-ae="name"</code>, present or future</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">ae(name, root)</dt><dd class="text-stone-600">same, scoped to descendants of <code class="font-mono text-[12px]">root</code></dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">ae.signal(v)</dt><dd class="text-stone-600">reactive value; writes batch per microtask</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">ae.computed(fn)</dt><dd class="text-stone-600">lazy derived value; notifies only on real change</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">ae.effect(fn)</dt><dd class="text-stone-600">auto-tracked side effect; returns dispose</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">ae.parts(root)</dt><dd class="text-stone-600">named <code class="font-mono text-[12px]">data-ae</code> descendants of a stamped node</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">ae.itemOf(el)</dt><dd class="text-stone-600">the current list item an element belongs to</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">ae.transition(fn)</dt><dd class="text-stone-600">run writes inside a View Transition; enters, exits, and moves animate in CSS</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">ae.settled()</dt><dd class="text-stone-600">resolves when writes and mounts have drained</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">ae.isSignal(v)</dt><dd class="text-stone-600">true for signals and computeds</dd></div>
           </dl>
         </div>
         <div>
           <h3 class="font-mono text-xs uppercase tracking-widest text-stone-400">Handle — everything chains</h3>
           <dl class="mt-4 space-y-3 text-sm">
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.render(fn)</dt><dd class="text-stone-600">auto-tracked render per element</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.mount(fn)</dt><dd class="text-stone-600">setup per element; return a cleanup</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.scope(fn)</dt><dd class="text-stone-600">per-root setup whose scoped handles retire on unmount</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.press / .hover / .on</dt><dd class="text-stone-600">semantic activation · pointer enter/leave · any event</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.text .cls .attr .show</dt><dd class="text-stone-600">sugar; take a value, a signal, or a function</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.input(signal)</dt><dd class="text-stone-600">two-way, typed by field kind</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.list(items, render, key)</dt><dd class="text-stone-600">keyed template stamping with node reuse</dd></div>
-            <div class="flex gap-4"><dt class="w-44 shrink-0 font-mono text-[13px] text-amber-900">.els / .each(fn)</dt><dd class="text-stone-600">escape hatches to the raw elements</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">.render(fn)</dt><dd class="text-stone-600">auto-tracked render per element</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">.mount(fn)</dt><dd class="text-stone-600">setup per element; return a cleanup</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">.scope(fn)</dt><dd class="text-stone-600">per-root setup whose scoped handles retire on unmount</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">.press / .hover / .on</dt><dd class="text-stone-600">semantic activation · pointer enter/leave · any event</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">.text .cls .attr .show</dt><dd class="text-stone-600">sugar; take a value, a signal, or a function</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">.input(signal)</dt><dd class="text-stone-600">two-way, typed by field kind</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">.list(items, render, key)</dt><dd class="text-stone-600">keyed template stamping with node reuse</dd></div>
+            <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">.els / .each(fn)</dt><dd class="text-stone-600">escape hatches to the raw elements</dd></div>
           </dl>
         </div>
       </div>
