@@ -12,7 +12,7 @@ Tiny attribute-based behavior + reactivity library. **HTML is the source of
 truth** — you write real markup, `ae` attaches behavior to it. No virtual DOM,
 no hydration, no template syntax, no build step required.
 
-**3.2 KB** min+gzip · zero dependencies · TypeScript · one `data-ae` attribute
+**3.9 KB** min+gzip · zero dependencies · TypeScript · one `data-ae` attribute
 
 ## Install
 
@@ -69,11 +69,13 @@ on change. Sugar helpers `.text()` / `.cls()` / `.attr()` / `.show()` accept a
 plain value (applied once), a signal, or a function (both reactive).
 
 **Events** — `.press(fn)` is semantic activation: click everywhere, plus
-synthesized Enter/Space only for elements the browser doesn't natively
+native-like Enter/Space only for elements the browser doesn't natively
 activate (keyboard-accessible `div[tabindex]`, `[role=button]` for free, no
-double-fire on real buttons). `.hover(enter, leave)` and the `.on(type, fn,
-opts)` escape hatch round it out — all listeners per element, so non-bubbling
-events just work.
+double-fire on real buttons). Enter fires on keydown, Space on keyup —
+exactly like a native button — and keys inside nested form controls or
+editable text are never hijacked. `.hover(enter, leave)` and the `.on(type,
+fn, opts)` escape hatch round it out — all listeners per element, so
+non-bubbling events just work.
 
 **Keyed lists** — `.list(items, render, key)` stamps a native `<template>`
 per item with keyed reconciliation: reorders move nodes without remounting,
@@ -97,11 +99,16 @@ ae('remove').press(btn => {                 // which item was clicked?
 ```
 
 **Two-way forms** — `.input(signal)` wires by field type: strings for
-text/select, booleans for checkboxes, real numbers for number/range. Writes
-are equality-guarded so echoes never move the caret.
+text/select, booleans for checkboxes, real numbers for number/range, a group
+value for radios, and `string[]` for `<select multiple>`. Writes are
+equality-guarded so echoes never move the caret.
 
 **Scoped roots** — `ae(name, root)` limits a handle to descendants of `root`:
 per-list behavior without global name collisions.
+
+**Shadow DOM** — `ae.observe(shadowRoot)` extends the same liveness into a
+shadow tree: existing marked content mounts immediately, host removal cleans
+everything up, and the returned disposer undoes it all.
 
 **Animation** — `ae.transition(fn)` runs your signal writes inside a browser
 View Transition: list enters, exits, and reorders animate in pure CSS, and
@@ -126,12 +133,12 @@ two of them event listeners.
 
 | operation | time |
 |---|---|
-| create 1,000 rows | 34 ms |
-| create 10,000 rows | 257 ms |
-| append 1,000 to 10,000 | 72 ms |
-| update every 10th of 11,000 | 142 ms |
-| swap 2 rows of 11,000 | 76 ms |
-| clear 11,000 rows | 50 ms |
+| create 1,000 rows | 26 ms |
+| create 10,000 rows | 262 ms |
+| append 1,000 to 10,000 | 69 ms |
+| update every 10th of 11,000 | 117 ms |
+| swap 2 rows of 11,000 | 75 ms |
+| clear 11,000 rows | 58 ms |
 
 Reproduce: `bun run serve` → `examples/bench.html` (add `?auto` for the
 full suite).
@@ -140,10 +147,11 @@ full suite).
 
 ```sh
 bun install
-bun run build   # tsc → dist/ae.js + dist/ae.d.ts
-bun run test    # jsdom smoke suite (build first)
-bun run serve   # demo at http://localhost:4242
-bun run min     # dist/ae.min.js
+bun run build          # tsc → dist/*.js + declarations (entry: dist/ae.js)
+bun run test           # jsdom smoke suite (build first)
+bun run test:browser   # Playwright: Chromium, Firefox, WebKit
+bun run serve          # demo at http://localhost:4242
+bun run min            # dist/ae.min.js
 ```
 
 ## Guarantees (the short version)

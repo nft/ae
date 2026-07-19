@@ -1,6 +1,6 @@
 # ae (@aeroapp/ae) — compact API for AI agents
 
-Attribute-based DOM reactivity, 3.2 KB min+gzip, zero deps, ES module.
+Attribute-based DOM reactivity, 3.9 KB min+gzip, zero deps, ES module.
 HTML is the source of truth: write real markup, attach behavior by name.
 No virtual DOM, no hydration, no build step, no template syntax.
 
@@ -25,12 +25,16 @@ Never manually re-bind or unbind.
 - `ae.signal(v)` → `{ value }`. Writes batch per microtask; `Object.is`-equal
   writes are no-ops. Three writes in one tick → one re-render.
 - `ae.computed(fn)` → read-only `{ value }`; lazy; notifies only when the
-  computed value actually changes.
+  computed value actually changes (glitch-free, even in diamond graphs).
+  Keep `fn` pure — it may run when upstream values are ultimately unchanged.
 - `ae.effect(fn)` → auto-tracked side effect, runs immediately, returns
   dispose function.
 - `ae.isSignal(v)` → true for signals/computeds.
 - `ae.settled()` → Promise; resolves when writes, list stamping, and mounts
   have drained. Use in tests instead of setTimeout.
+- `ae.observe(shadowRoot)` → dispose; extends liveness into a shadow tree
+  (nested shadow roots each need their own call; refcounted per root; host
+  removal unmounts the subtree, re-insertion remounts).
 
 ## Handle methods (all chain, callbacks get the element first)
 
@@ -39,8 +43,10 @@ Never manually re-bind or unbind.
 - `.mount(fn)` — setup once per element; return a function to run as cleanup
   on removal.
 - `.scope(fn)` — per-root setup that creates SCOPED handles (see below).
-- `.press(fn)` — activation: click, plus Enter/Space only for elements the
-  browser doesn't natively activate (no double-fire on real buttons).
+- `.press(fn)` — activation: click, plus native-like Enter/Space only for
+  elements the browser doesn't natively activate (no double-fire on real
+  buttons; Enter on keydown, Space on keyup; nested form controls and
+  editable text are never hijacked).
 - `.hover(enter, leave?)` — pointerenter/pointerleave.
 - `.on(type, fn, opts?)` — any DOM event, per-element listener (non-bubbling
   events work). Handler signature: `(el, event)`.
@@ -49,9 +55,12 @@ Never manually re-bind or unbind.
   (both reactive). `.attr`: null/undefined/false removes, true sets empty.
 - `.input(signal)` — two-way form binding typed by field: text/textarea/select
   ↔ Signal<string>, checkbox ↔ Signal<boolean>, number/range ↔ Signal<number>
-  via valueAsNumber (empty number field reads NaN — guard for it). Writes are
+  via valueAsNumber (empty number field reads NaN — guard for it), radio ↔
+  Signal<string> group value (give radios value= attributes; signal enforces
+  exclusivity across bound radios; unmatched value unchecks them), select
+  multiple ↔ Signal<string[]> (option order; write a NEW array). Writes are
   equality-guarded (caret never moves). Multiple fields on one signal mirror
-  each other. Radio groups / multi-select: use `.on` instead.
+  each other.
 - `.list(items, render, key?)` — keyed list stamping from the container's
   native `<template>` (exactly one root element). `items`: signal/computed/
   function of an array. `render(el, item, index)` runs in its own effect.

@@ -3,9 +3,11 @@
 Tiny attribute-based behavior + reactivity lib. No virtual DOM, no hydration:
 HTML is the source of truth, `ae` attaches behavior to it.
 
-Written in TypeScript (`src/ae.ts`), ships as an ES module with type
-declarations. `npm run build` → `dist/ae.js` + `dist/ae.d.ts`, `npm test` runs
-the jsdom smoke suite, `npm run serve` hosts the site at `site/index.html`.
+Written in TypeScript (`src/`, entry `src/ae.ts`), ships as an ES module with
+type declarations. `npm run build` → `dist/*.js` + declarations (entry
+`dist/ae.js`), `npm test` runs the jsdom smoke suite, `npm run test:browser`
+runs the Playwright suite, `npm run serve` hosts the site at
+`site/index.html`.
 
 ```html
 <button data-ae="save">Save</button>
@@ -98,13 +100,22 @@ Writes are **batched**: multiple writes in the same tick trigger one re-render,
 on the next microtask. Setting an identical value (`Object.is`) is a no-op.
 
 ### `ae.computed(fn) → Computed (read-only)`
-Derived value. Lazy until first read; after that it re-computes when a
-dependency changes and notifies dependents **only when the computed value
-actually changed** (`Object.is`) — unchanged results cause no re-renders.
+Derived value. Lazy until first read; after that a dependency write marks it
+stale and it re-evaluates once per flush (or on the next read — reading
+right after a write is always fresh). Dependents are notified **only when
+the computed value actually changed** (`Object.is`) — unchanged results
+cause no re-renders, even in diamond-shaped dependency graphs.
 
 ```js
 const total = ae.computed(() => price.value * qty.value);
 ```
+
+`fn` must be pure: it can run when upstream values turn out unchanged, and
+a computed nobody currently subscribes to skips re-evaluation entirely
+until it is read again. If `fn` throws during a flush, the error is logged,
+subscribers keep the last good value, and the computed retries on the next
+dependency write or read; a throw during an explicit `.value` read
+propagates to the reader.
 
 ### `ae.parts(root) → { name: element }`
 Named lookup of `data-ae` **descendants** of `root` (the root itself is not a
@@ -161,6 +172,21 @@ Auto-tracked side effect not tied to an element (logging, storage, fetch
 triggers). Runs immediately, re-runs when its signals change. Returns a
 function that stops it.
 
+### `ae.observe(shadowRoot) → dispose`
+Extends liveness into a shadow tree — the document observer cannot pierce
+shadow boundaries, and neither can this (nested shadow roots each need
+their own call). Marked content already inside mounts immediately when the
+host is connected; removing the host unmounts the subtree and re-inserting
+it remounts; moving an element from an observed shadow root into an
+unobserved one unmounts it. Observation is refcounted per root: each call
+returns its own idempotent disposer, and the observer disconnects (and the
+subtree unmounts) when the last one runs.
+
+```js
+const shadow = host.attachShadow({ mode: 'open' });
+const stop = ae.observe(shadow);
+```
+
 ## Handle API
 
 All methods return the handle — everything chains. Callbacks receive the
@@ -189,7 +215,7 @@ nested `data-ae` elements never shadow each other. Handlers get `(el, event)`.
 
 | method | behavior |
 |---|---|
-| `.press(fn)` | Activation: `click` for every element. `Enter`/`Space` keydown is synthesized **only** for elements the browser does not natively activate (e.g. `div[tabindex]`, `[role=button]`) — native buttons/links already turn Enter/Space into `click` (adding our own would double-fire), and text fields are never hijacked. |
+| `.press(fn)` | Activation: `click` for every element. Native-like Enter/Space is synthesized **only** for elements the browser does not natively activate (e.g. `div[tabindex]`, `[role=button]`) — native buttons/links already turn Enter/Space into `click` (adding our own would double-fire). Enter fires on keydown (key repeats included); Space fires once on keyup, its keydown only prevents page scroll, and moving focus mid-press cancels. Keys originating in nested native controls or editable text (including inherited `contenteditable`) are ignored, so typing is never hijacked. |
 | `.hover(enter, leave?)` | `pointerenter` / `pointerleave` on the element itself — nesting-safe by construction. |
 | `.on(type, fn, opts?)` | Escape hatch for any DOM event type. `opts` is a standard `AddEventListenerOptions` (`once`, `passive`, `capture`, …) and is passed through. |
 
@@ -214,7 +240,7 @@ Apply to every element in the handle. Sugar — everything is also doable inside
 
 | method | behavior |
 |---|---|
-| `.input(signal)` | Two-way binding, wired by field type: text-like inputs / `<textarea>` / `<select>` ↔ `Signal<string>` via `value`; `type=checkbox` ↔ `Signal<boolean>` via `checked`; `type=number\|range` ↔ `Signal<number>` via `valueAsNumber` (empty field reads as `NaN`). Signal → field is reactive; field → signal on `input`/`change`. Writes are equality-guarded, so echoes never move the caret. Several fields bound to one signal mirror each other. Radio groups and multi-select are out of scope — use `.on` directly. Non-form elements log an error and no-op. |
+| `.input(signal)` | Two-way binding, wired by field type: text-like inputs / `<textarea>` / `<select>` ↔ `Signal<string>` via `value`; `type=checkbox` ↔ `Signal<boolean>` via `checked`; `type=number\|range` ↔ `Signal<number>` via `valueAsNumber` (empty field reads as `NaN`); `type=radio` ↔ `Signal<string>` holding the group value — give radios explicit `value=` attributes; the signal enforces exclusivity across **all bound radios** even without `name=` (an unbound radio sharing a native `name` is untouched), and an unmatched signal value unchecks all bound radios; `<select multiple>` ↔ `Signal<string[]>` — values read in option order, writes select the wanted **set** of values (duplicate option values toggle together), and you must write a **new** array (in-place mutation never notifies). Signal → field is reactive; field → signal on `input`/`change`. Writes are equality-guarded (element-wise for arrays), so echoes never move the caret. Several fields bound to one signal mirror each other. Non-form elements log an error and no-op. |
 
 ### Lists
 
@@ -261,7 +287,8 @@ old node into the new one.
 
 - **Liveness**: one `MutationObserver` on `document.body` powers everything —
   mount/cleanup, late elements, and `data-ae` attributes that are added,
-  removed, or renamed after insertion. No per-handle observers.
+  removed, or renamed after insertion — plus one per shadow root opted in
+  via `ae.observe`. No per-handle observers.
 - **Batching**: signal writes coalesce per microtask; each affected `render`/
   `effect` runs at most once per flush.
 - **Disposal**: when an element leaves the DOM, its mount cleanups run, its
@@ -278,7 +305,10 @@ old node into the new one.
   The one exception: an `ae.effect` whose **initial** run throws propagates
   the error synchronously to the caller and leaves no trace (nothing
   subscribed, nothing queued). Element bindings (`.render`/`.mount`) are
-  always isolated, including their first run.
+  always isolated, including their first run. A computed that throws during
+  a flush is logged too — its subscribers keep the last good value and it
+  recovers on the next dependency write or read; only an explicit `.value`
+  read surfaces the error to the reader.
 - **Runaway guard**: an effect that writes a signal it also reads trips a
   circuit breaker after 100 flush cycles (with a `console.error`) instead of
   hanging the tab.
