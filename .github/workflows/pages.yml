@@ -15,7 +15,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+      # One real browser as a deploy gate; the full matrix runs in ci.yml.
+      - run: bunx playwright install --with-deps chromium
+      - run: bunx playwright test --project=chromium
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -32,7 +47,7 @@ jobs:
           mkdir _site
           sed 's|\.\./|./|g' site/index.html > _site/index.html
           cp -R dist examples _site/
-          cp site/logo.svg _site/
+          cp site/logo.svg site/tailwind.css _site/
           cp API.md README.md LICENSE llms.txt _site/
           touch _site/.nojekyll
 

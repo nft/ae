@@ -17,11 +17,17 @@ jobs:
         with:
           node-version: 22
       - run: bun install --frozen-lockfile
+      # Tag pushes do not trigger the branch-filtered ci workflow, so the
+      # release runs its own gate: the jsdom suite plus one real browser.
+      - run: bun run test
+      - run: bunx playwright install --with-deps chromium
+      - run: bunx playwright test --project=chromium
       # trusted publishing needs npm >= 11.5.1; Node 22 bundles npm 10
       - run: npm install -g npm@latest
       # prepublishOnly runs the test suite and builds dist + min;
       # provenance is attached automatically under trusted publishing
       - run: npm publish --access public
-      - run: gh release create "$GITHUB_REF_NAME" --generate-notes || true # exists already? fine
+      # idempotent re-runs: only create the release if it does not exist yet
+      - run: gh release view "$GITHUB_REF_NAME" || gh release create "$GITHUB_REF_NAME" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}

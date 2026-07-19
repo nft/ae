@@ -34,7 +34,8 @@ serve it the moment you need it:
 </script>
 ```
 
-Pin a version in production, e.g. `https://esm.sh/@aeroapp/ae@0.4.0`.
+Pin an exact version in production — `https://esm.sh/@aeroapp/ae@X.Y.Z` (see
+the npm badge above for the current release).
 
 ```html
 <button data-ae="save">Save</button>
