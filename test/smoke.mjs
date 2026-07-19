@@ -1084,5 +1084,144 @@ const fireInput = (node) => node.dispatchEvent(new dom.window.Event('input', { b
   assert(presses === 1, `throwing scope cleanup does not stack bindings on remount (presses=${presses})`);
 }
 
+// --- R3: diamond dependency — no glitch, single recompute --------------------
+{
+  const s = ae.signal(1);
+  let cComputes = 0;
+  const a = ae.computed(() => s.value > 0);
+  const b = ae.computed(() => s.value < 10);
+  const c = ae.computed(() => { cComputes++; return a.value && b.value; });
+  let effectRuns = 0;
+  const dispose = effect(() => { effectRuns++; void c.value; });
+  assert(cComputes === 1 && effectRuns === 1, 'diamond primes once');
+  s.value = 2; // a, b, c all recompute to unchanged values
+  await tick();
+  assert(effectRuns === 1, 'diamond: unchanged final value causes ZERO extra effect runs');
+  assert(cComputes === 2, `diamond: C recomputes exactly once per write (got ${cComputes - 1} for one write)`);
+  s.value = -1; // a flips → c flips
+  await tick();
+  assert(effectRuns === 2 && cComputes === 3, 'diamond: changed value → exactly one effect run, one recompute');
+  dispose();
+}
+
+// --- R4: first-read throw does not poison the computed -----------------------
+{
+  let shouldThrow = true;
+  const c = ae.computed(() => { if (shouldThrow) throw new Error('boom'); return 42; });
+  let threw = false;
+  try { void c.value; } catch { threw = true; }
+  assert(threw, 'first read of a throwing computed throws to the reader');
+  shouldThrow = false;
+  assert(c.value === 42, 'a later read retries instead of returning undefined forever');
+}
+
+// --- R5: computed throw during propagation is isolated -----------------------
+{
+  const s = ae.signal(0);
+  const bad = ae.computed(() => { if (s.value > 0) throw new Error('boom'); return 'ok'; });
+  const good = ae.computed(() => s.value * 2);
+  let badRuns = 0;
+  let goodRuns = 0;
+  let plainRuns = 0;
+  const d1 = effect(() => { badRuns++; void bad.value; });
+  const d2 = effect(() => { goodRuns++; void good.value; });
+  const d3 = effect(() => { plainRuns++; void s.value; });
+  const origError = console.error;
+  let logged = false;
+  console.error = (...args) => { if (String(args[0]).includes('computed threw')) logged = true; };
+  let writeThrew = false;
+  try { s.value = 1; } catch { writeThrew = true; }
+  await tick();
+  console.error = origError;
+  assert(!writeThrew, 'a throwing computed never throws at the signal writer');
+  assert(logged, 'flush-time computed error is logged');
+  assert(goodRuns === 2 && plainRuns === 2, 'sibling computed and plain effects still run');
+  assert(badRuns === 1, 'the throwing computed does not run its own subscribers');
+  d1(); d2(); d3();
+}
+
+// --- R6: automatic recovery after a flush-time throw --------------------------
+{
+  const s = ae.signal(1);
+  const c = ae.computed(() => { if (s.value === 2) throw new Error('boom'); return s.value * 10; });
+  const seen = [];
+  const d = effect(() => { seen.push(c.value); });
+  const origError = console.error;
+  console.error = () => {};
+  s.value = 2; // evaluation throws at flush; subscriber keeps 10
+  await tick();
+  s.value = 3; // the next dependency write must re-queue the computed
+  await tick();
+  console.error = origError;
+  assert(seen.join(',') === '10,30', `subscribers recover with no imperative read (got ${seen.join(',')})`);
+  d();
+}
+
+// --- R7: recovery after the dependency set changed, then threw ----------------
+{
+  const useB = ae.signal(false);
+  const aSig = ae.signal(1);
+  const bSig = ae.signal(-1);
+  const c = ae.computed(() => {
+    const v = useB.value ? bSig.value : aSig.value;
+    if (v < 0) throw new Error('neg');
+    return v;
+  });
+  const seen = [];
+  const d = effect(() => { seen.push(c.value); });
+  const origError = console.error;
+  console.error = () => {};
+  useB.value = true; // switches the dep set to bSig, then throws (-1)
+  await tick();
+  bSig.value = 5; // a write to the NEW dep must recover it
+  await tick();
+  console.error = origError;
+  assert(seen.join(',') === '1,5', `computed recovers after dep-set switch + throw (got ${seen.join(',')})`);
+  d();
+}
+
+// --- R8: unobserved computed goes cold ----------------------------------------
+{
+  const s = ae.signal(1);
+  let computes = 0;
+  const c = ae.computed(() => { computes++; return s.value + 1; });
+  const d = effect(() => { void c.value; });
+  assert(computes === 1, 'computed primed by its effect');
+  d();
+  s.value = 2;
+  await tick();
+  assert(computes === 1, 'computed with no subscribers does not recompute on writes');
+  assert(c.value === 3 && computes === 2, 'a later read pulls a fresh value on demand');
+}
+
+// --- R9: synchronous fresh read right after a write ---------------------------
+{
+  const s = ae.signal(1);
+  const c = ae.computed(() => s.value * 2);
+  assert(c.value === 2, 'initial computed read');
+  s.value = 5;
+  assert(c.value === 10, 'computed read immediately after a write is fresh (no tick)');
+  await tick();
+}
+
+// --- R10: deep chain equality cutoff ------------------------------------------
+{
+  const s = ae.signal(5);
+  const clamped = ae.computed(() => Math.min(s.value, 10));
+  const doubled = ae.computed(() => clamped.value * 2);
+  let runs = 0;
+  const d = effect(() => { runs++; void doubled.value; });
+  s.value = 7;
+  await tick();
+  assert(runs === 2, 'changed chain value re-runs the effect');
+  s.value = 20; // clamps to 10 — changed
+  await tick();
+  assert(runs === 3, 'clamp boundary change propagates');
+  s.value = 30; // still clamped to 10 — unchanged
+  await tick();
+  assert(runs === 3, 'unchanged clamped value does not re-run the effect');
+  d();
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

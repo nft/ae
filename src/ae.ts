@@ -21,6 +21,8 @@ interface Runner {
 let activeRunner: Runner | null = null;
 
 const queue = new Set<Runner>();
+// Hot computeds invalidated since the last flush cycle, awaiting re-evaluation.
+let dirty: Computed<unknown>[] = [];
 let flushing = false;
 let scheduled = false;
 
@@ -34,14 +36,32 @@ function flush(): void {
   flushing = true;
   try {
     let cycles = 0;
-    while (queue.size > 0) {
+    while (queue.size > 0 || dirty.length > 0) {
       if (++cycles > MAX_FLUSH_CYCLES) {
+        // Aborted computeds stay _dirty with _queued reset — stale until the
+        // next invalidation or read, same recovery contract as a throw.
         queue.clear();
+        dirty.length = 0;
         console.error(
           '[ae] update flush aborted after ' + MAX_FLUSH_CYCLES +
           ' cycles — an effect is probably writing a signal it also reads',
         );
         return;
+      }
+      // Re-evaluate invalidated computeds before running effects, so effects
+      // are only scheduled for computeds whose FINAL value actually changed
+      // (a diamond otherwise causes a spurious effect run). Pull recursion
+      // through the getters resolves dependency order — no sort needed.
+      const dc = dirty;
+      dirty = [];
+      for (const c of dc) {
+        c._queued = false;
+        if (!c._dirty || c._subs.size === 0) continue; // pulled already, or unobserved stays lazy
+        try {
+          c._update();
+        } catch (err) {
+          console.error('[ae] computed threw:', err);
+        }
       }
       const batch = [...queue];
       queue.clear();
@@ -61,13 +81,17 @@ function flush(): void {
   }
 }
 
-function schedule(run: Runner): void {
-  if (!run.active) return;
-  queue.add(run);
+function scheduleFlush(): void {
   if (!scheduled && !flushing) {
     scheduled = true;
     queueMicrotask(flush);
   }
+}
+
+function schedule(run: Runner): void {
+  if (!run.active) return;
+  queue.add(run);
+  scheduleFlush();
 }
 
 /**
@@ -203,19 +227,31 @@ export class Signal<T> {
 export class Computed<T> {
   /** @internal */
   readonly _subs = new Set<Runner>();
+  /** Value is stale; born dirty = born lazy. @internal */
+  _dirty = true;
+  /** Sitting in the pending `dirty` drain array. Separate from _dirty so a
+   * computed whose evaluation threw at flush time is re-queued by the next
+   * dependency write instead of being orphaned forever. @internal */
+  _queued = false;
   private _value!: T;
-  private _hot = false;
   private readonly _runner: Runner;
   private readonly _fn: () => T;
 
   constructor(fn: () => T) {
     this._fn = fn;
+    // Invalidation only — no user code runs here, so a dependency write can
+    // never throw at the writer and never starves sibling subscribers.
     const runner = (() => {
-      const next = runTracked(runner, this._fn);
-      if (!Object.is(next, this._value)) {
-        this._value = next;
-        notify(this._subs);
+      const wasDirty = this._dirty;
+      this._dirty = true;
+      if (!this._queued) {
+        this._queued = true;
+        dirty.push(this as Computed<unknown>);
+        scheduleFlush();
       }
+      // Invariant: dirty ⇒ every downstream computed is dirty, so a repeat
+      // mark has nothing left to propagate.
+      if (!wasDirty) for (const r of [...this._subs]) if (r.sync) r();
     }) as Runner;
     runner.deps = new Set();
     runner.sync = true;
@@ -223,12 +259,26 @@ export class Computed<T> {
     this._runner = runner;
   }
 
+  /** Recompute now. Clears _dirty only on success, so a throwing fn retries
+   * on the next read instead of poisoning the cached value. @internal */
+  _update(): void {
+    const next = runTracked(this._runner, this._fn);
+    this._dirty = false;
+    if (!Object.is(next, this._value)) {
+      this._value = next;
+      for (const r of [...this._subs]) {
+        if (r === activeRunner) continue; // the reader consuming us right now
+        // Sync subs re-queue downstream computeds left dirty-but-unqueued by
+        // an earlier throw; their runner guards make repeats cheap no-ops.
+        if (r.sync) r();
+        else schedule(r);
+      }
+    }
+  }
+
   get value(): T {
     track(this._subs);
-    if (!this._hot) {
-      this._hot = true;
-      this._value = runTracked(this._runner, this._fn);
-    }
+    if (this._dirty) this._update();
     return this._value;
   }
 }
