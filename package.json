@@ -1,6 +1,6 @@
 {
   "name": "@aeroapp/ae",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Tiny attribute-based behavior + reactivity library. HTML is the source of truth: one data-ae attribute, signals, keyed lists, two-way forms, View-Transition animation. No virtual DOM, no hydration, no build step required.",
   "keywords": [
     "reactivity",
