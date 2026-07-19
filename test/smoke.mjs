@@ -1037,5 +1037,52 @@ const fireInput = (node) => node.dispatchEvent(new dom.window.Event('input', { b
   await tick();
 }
 
+// ===========================================================================
+// Regressions from the 2026-07-19 external review
+// ===========================================================================
+
+// --- R1: removing a .list container unmounts its stamped descendants --------
+{
+  const dep = ae.signal(0);
+  let mounts = 0;
+  let cleanups = 0;
+  let renders = 0;
+  ae('r1-row')
+    .mount(() => { mounts++; return () => cleanups++; })
+    .render(() => { renders++; void dep.value; });
+  const ul = el('<ul data-ae="r1-list"><template><li data-ae="r1-row"></li></template></ul>');
+  await tick();
+  ae('r1-list').list(ae.signal(['a', 'b', 'c']), () => {});
+  await tick();
+  assert(mounts === 3 && renders === 3, `rows mounted (mounts=${mounts}, renders=${renders})`);
+  ul.remove(); // the container itself carries data-ae — its own cleanup
+  await tick(); // detaches the rows before descendants are visited
+  assert(cleanups === 3, `container removal unmounts stamped rows (cleanups=${cleanups})`);
+  dep.value = 1;
+  await tick();
+  assert(renders === 3, `removed rows' renders are disposed, not just counted (renders=${renders})`);
+}
+
+// --- R2: a throwing .scope() cleanup still retires scoped handles ------------
+{
+  const root = el('<div data-ae="r2-root"><button data-ae="r2-btn"></button></div>');
+  const btn = root.querySelector('button');
+  await tick();
+  let presses = 0;
+  ae('r2-root').scope((r) => {
+    ae('r2-btn', r).press(() => presses++);
+    return () => { throw new Error('cleanup boom'); };
+  });
+  const origError = console.error;
+  console.error = () => {};
+  root.remove();
+  await tick();
+  console.error = origError;
+  document.body.append(root);
+  await tick();
+  btn.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  assert(presses === 1, `throwing scope cleanup does not stack bindings on remount (presses=${presses})`);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

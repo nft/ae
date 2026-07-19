@@ -337,10 +337,18 @@ function unmountElement(el: HTMLElement): void {
 
 /** Visit root and its descendants that carry data-ae. */
 function forEachMarked(root: Node, fn: (el: HTMLElement) => void): void {
-  if (root.nodeType !== 1 /* ELEMENT_NODE */) return;
-  const el = root as HTMLElement;
-  if (el.dataset?.ae !== undefined) fn(el);
-  el.querySelectorAll<HTMLElement>('[data-ae]').forEach(fn);
+  // Snapshot before invoking: a cleanup run by fn may detach descendants
+  // (e.g. a .list container's cleanup removes its stamped nodes), and a
+  // live walk would then silently skip their unmounts.
+  const marked: HTMLElement[] = [];
+  if (root.nodeType === 1 /* ELEMENT_NODE */) {
+    const el = root as HTMLElement;
+    if (el.dataset?.ae !== undefined) marked.push(el);
+  } else if (root.nodeType !== 11 /* DOCUMENT_FRAGMENT (ShadowRoot) */) {
+    return; // text/comment nodes from mutation records
+  }
+  (root as ParentNode).querySelectorAll<HTMLElement>('[data-ae]').forEach((el) => marked.push(el));
+  for (const el of marked) fn(el);
 }
 
 function selectorFor(name: string): string {
@@ -432,8 +440,13 @@ export class Handle {
         scopeCreated = prev;
       }
       return () => {
-        if (typeof cleanup === 'function') cleanup();
-        for (const root of created) scopedHandles.delete(root);
+        try {
+          if (typeof cleanup === 'function') cleanup();
+        } finally {
+          // Retire even when the user cleanup throws — a stale map would
+          // stack duplicate bindings onto cached handles on remount.
+          for (const root of created) scopedHandles.delete(root);
+        }
       };
     });
   }
