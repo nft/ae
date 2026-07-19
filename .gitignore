@@ -20,3 +20,7 @@ npm-debug.log*
 .idea/
 
 tmp/
+
+# Playwright
+playwright-report/
+test-results/

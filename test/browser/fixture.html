@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ae browser-test fixture</title>
+  <script type="importmap">{ "imports": { "@aeroapp/ae": "/dist/ae.js" } }</script>
+</head>
+<body>
+  <button data-ae="btn">go</button>
+  <div data-ae="divbtn" tabindex="0">divbtn</div>
+  <div data-ae="card" tabindex="0">card <input data-ae="cardfield" aria-label="card field"></div>
+  <input data-ae="field" aria-label="field">
+  <span data-ae="out"></span>
+  <ul data-ae="items"><template><li><b data-ae="title"></b></li></template></ul>
+  <!-- tall spacer so a Space keypress that escapes preventDefault would scroll -->
+  <div style="height: 300vh"></div>
+  <script type="module">
+    import { ae } from '@aeroapp/ae';
+    window.ae = ae;
+  </script>
+</body>
+</html>

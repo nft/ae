@@ -49,11 +49,13 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "bun run build && bun test/smoke.mjs",
+    "test:browser": "playwright test",
     "serve": "bun scripts/serve.ts",
     "min": "bun build src/ae.ts --minify --outfile=dist/ae.min.js",
     "prepublishOnly": "bun run test && bun run min"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.0",
     "jsdom": "^29.1.1",
     "typescript": "^7.0.2"
   }
