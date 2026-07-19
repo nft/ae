@@ -1283,5 +1283,126 @@ const fireInput = (node) => node.dispatchEvent(new dom.window.Event('input', { b
   assert(fires === 0, 'Space keyup without a prior armed keydown does not fire');
 }
 
+// ===========================================================================
+// .input(): radio groups and multi-select
+// ===========================================================================
+
+// --- radio group: signal is the source of truth, both directions --------------
+{
+  const form = el(`<form>
+    <input type="radio" name="rg" data-ae="i-radio" value="a">
+    <input type="radio" name="rg" data-ae="i-radio" value="b">
+    <input type="radio" name="rg" data-ae="i-radio" value="c">
+  </form>`);
+  const radios = [...form.querySelectorAll('input')];
+  await tick();
+  const pick = ae.signal('b');
+  ae('i-radio').input(pick);
+  assert(radios.map((r) => r.checked).join(',') === 'false,true,false', 'radio: signal → checked on bind');
+  pick.value = 'c';
+  await tick();
+  assert(radios.map((r) => r.checked).join(',') === 'false,false,true', 'radio: signal write moves the check');
+  radios[0].checked = true; // the browser unchecks name= siblings itself
+  fireInput(radios[0]);
+  assert(pick.value === 'a', 'radio: user check writes its value to the signal');
+  pick.value = 'zzz';
+  await tick();
+  assert(radios.every((r) => !r.checked), 'radio: unmatched signal value unchecks all bound radios');
+}
+
+// --- nameless radios stay exclusive via the signal ----------------------------
+{
+  const box = el(`<div>
+    <input type="radio" data-ae="i-radio-nameless" value="x">
+    <input type="radio" data-ae="i-radio-nameless" value="y">
+  </div>`);
+  const [x, y] = [...box.querySelectorAll('input')];
+  await tick();
+  const pick = ae.signal('y');
+  ae('i-radio-nameless').input(pick);
+  assert(!x.checked && y.checked, 'nameless radio: bind checks the match');
+  x.checked = true; // no name= — the browser will NOT uncheck y
+  fireInput(x);
+  await tick();
+  assert(pick.value === 'x', 'nameless radio: check writes the signal');
+  assert(x.checked && !y.checked, 'nameless radio: the signal unchecks the other radio');
+}
+
+// --- radio unmount detaches ----------------------------------------------------
+{
+  const r = el('<input type="radio" data-ae="i-radio-gone" value="k">');
+  await tick();
+  const pick = ae.signal('k');
+  ae('i-radio-gone').input(pick);
+  assert(r.checked, 'radio bound and checked');
+  r.remove();
+  await tick();
+  pick.value = 'other';
+  await tick();
+  assert(r.checked, 'removed radio no longer receives signal writes');
+  r.checked = false;
+  r.checked = true;
+  fireInput(r);
+  assert(pick.value === 'other', 'removed radio no longer writes to the signal');
+}
+
+// --- multi-select: signal ↔ selection, both directions -------------------------
+{
+  const sel = el(`<select multiple data-ae="i-multi">
+    <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+  </select>`);
+  const opts = [...sel.querySelectorAll('option')];
+  await tick();
+  const chosen = ae.signal(['a', 'c']);
+  ae('i-multi').input(chosen);
+  assert(opts.map((o) => o.selected).join(',') === 'true,false,true', 'multi: signal → selection on bind');
+  chosen.value = ['b'];
+  await tick();
+  assert(opts.map((o) => o.selected).join(',') === 'false,true,false', 'multi: signal write replaces the selection');
+  chosen.value = [];
+  await tick();
+  assert(opts.every((o) => !o.selected), 'multi: empty array clears the selection');
+  opts[2].selected = true;
+  opts[0].selected = true;
+  fireInput(sel);
+  assert(chosen.value.join(',') === 'a,c', 'multi: user selection reads in option order');
+}
+
+// --- multi-select: echo guard, no notify loop ----------------------------------
+{
+  const sel = el(`<select multiple data-ae="i-multi-echo">
+    <option value="a">A</option><option value="b">B</option>
+  </select>`);
+  await tick();
+  const chosen = ae.signal(['a']);
+  let notifies = 0;
+  ae('i-multi-echo').input(chosen);
+  const dispose = effect(() => { notifies++; void chosen.value; });
+  const origError = console.error;
+  let breakerTripped = false;
+  console.error = (...args) => { if (String(args[0]).includes('flush aborted')) breakerTripped = true; };
+  fireInput(sel); // input+change double-fire with an unchanged selection
+  sel.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  await tick();
+  chosen.value = [...chosen.value]; // fresh-but-equal array from user code
+  await tick();
+  console.error = origError;
+  assert(notifies === 2, `equal selections do not re-notify (got ${notifies}, expected initial + 1 for the fresh array)`);
+  assert(!breakerTripped, 'multi echo guard never trips the flush circuit breaker');
+  dispose();
+}
+
+// --- multi-select: duplicate option values toggle as a set ----------------------
+{
+  const sel = el(`<select multiple data-ae="i-multi-dup">
+    <option value="a">A1</option><option value="a">A2</option><option value="b">B</option>
+  </select>`);
+  const opts = [...sel.querySelectorAll('option')];
+  await tick();
+  const chosen = ae.signal(['a']);
+  ae('i-multi-dup').input(chosen);
+  assert(opts.map((o) => o.selected).join(',') === 'true,true,false', 'multi: duplicate values select together (set semantics)');
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

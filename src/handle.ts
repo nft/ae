@@ -246,16 +246,24 @@ export class Handle {
    * Two-way form binding — sugar over `.render` + `.on('input')`.
    *
    * Field type decides the wiring per element:
-   * - text-like inputs, <textarea>, <select>  → Signal<string>  ↔ value
-   * - input[type=checkbox]                    → Signal<boolean> ↔ checked
-   * - input[type=number|range]                → Signal<number>  ↔ valueAsNumber
+   * - text-like inputs, <textarea>, <select>  → Signal<string>   ↔ value
+   * - input[type=checkbox]                    → Signal<boolean>  ↔ checked
+   * - input[type=number|range]                → Signal<number>   ↔ valueAsNumber
    *   (an empty number field reads as NaN; writing NaN clears it)
+   * - input[type=radio]                       → Signal<string>   ↔ group value
+   *   (give radios explicit value= attributes; the signal enforces
+   *   exclusivity across all BOUND radios even without name=, but an
+   *   unbound radio sharing a native name is untouched; an unmatched
+   *   signal value unchecks all bound radios)
+   * - <select multiple>                       → Signal<string[]> ↔ selection
+   *   (values read in option order; writes select the wanted SET of values,
+   *   so duplicate option values all toggle together; write a NEW array —
+   *   in-place mutation never notifies)
    *
    * Signal → element is reactive; element → signal fires on input/change.
-   * Writes are equality-guarded so echoes never move the caret. Radio groups
-   * and multi-select are out of scope — use `.on` directly.
+   * Writes are equality-guarded so echoes never move the caret.
    */
-  input<T extends string | number | boolean>(sig: Signal<T>): this {
+  input<T extends string | number | boolean | string[]>(sig: Signal<T>): this {
     return this._bind((el) => {
       const tag = el.tagName;
       const type = tag === 'INPUT' ? (el as HTMLInputElement).type : '';
@@ -264,12 +272,47 @@ export class Handle {
         return;
       }
       const field = el as HTMLInputElement;
-      const mode: 'checked' | 'number' | 'value' =
-        type === 'checkbox' ? 'checked' : type === 'number' || type === 'range' ? 'number' : 'value';
+      const mode: 'checked' | 'radio' | 'number' | 'multi' | 'value' =
+        type === 'checkbox'
+          ? 'checked'
+          : type === 'radio'
+            ? 'radio'
+            : type === 'number' || type === 'range'
+              ? 'number'
+              : tag === 'SELECT' && (el as unknown as HTMLSelectElement).multiple
+                ? 'multi'
+                : 'value';
+
+      // The echo guard for 'multi': Object.is never matches two arrays.
+      const eqArr = (a: readonly string[], b: unknown): boolean =>
+        Array.isArray(b) && b.length === a.length && a.every((x, i) => x === b[i]);
 
       const read = (): unknown =>
-        mode === 'checked' ? field.checked : mode === 'number' ? field.valueAsNumber : field.value;
+        mode === 'checked'
+          ? field.checked
+          : mode === 'number'
+            ? field.valueAsNumber
+            : mode === 'multi'
+              ? Array.from((field as unknown as HTMLSelectElement).selectedOptions, (o) => o.value)
+              : field.value;
+
       const write = (v: unknown): void => {
+        if (mode === 'radio') {
+          // One binding per radio: each sets only its own checkedness, so an
+          // unmatched signal value unchecks every bound radio in the group.
+          const want = v === field.value;
+          if (field.checked !== want) field.checked = want;
+          return;
+        }
+        if (mode === 'multi') {
+          const arr = v as readonly string[];
+          if (eqArr(arr, read())) return; // echo guard
+          const want = new Set(arr);
+          for (const opt of (field as unknown as HTMLSelectElement).options) {
+            opt.selected = want.has(opt.value);
+          }
+          return;
+        }
         if (Object.is(read(), v)) return; // echo guard: never disturb the caret
         if (mode === 'checked') field.checked = !!v;
         else if (mode === 'number') field.valueAsNumber = Number(v);
@@ -278,7 +321,17 @@ export class Handle {
 
       const disposeRender = effect(() => write(sig.value));
       const onInput = () => {
-        (sig as Signal<unknown>).value = read();
+        if (mode === 'radio') {
+          // An unchecked sibling never fires input; the guard makes the
+          // browser's input+change double-fire a Signal-level no-op.
+          if (field.checked) (sig as Signal<unknown>).value = field.value;
+          return;
+        }
+        const v = read();
+        // 'multi': input+change both fire per gesture with two DISTINCT
+        // arrays, which Object.is cannot dedupe — compare element-wise.
+        if (mode === 'multi' && eqArr(v as string[], sig.value)) return;
+        (sig as Signal<unknown>).value = v;
       };
       el.addEventListener('input', onInput);
       el.addEventListener('change', onInput);
