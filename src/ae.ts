@@ -419,7 +419,8 @@ function selectorFor(name: string): string {
 // synthesize a click) or where keys mean text entry. press() must not add its
 // own keydown for these: it would double-fire or hijack typing.
 const NATIVE_PRESS =
-  'button, a[href], input, select, textarea, summary, [contenteditable=""], [contenteditable="true"]';
+  'button, a[href], input, select, textarea, summary, ' +
+  '[contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]';
 
 export type PressEvent = MouseEvent | KeyboardEvent;
 
@@ -529,10 +530,12 @@ export class Handle {
   }
 
   /**
-   * Activation: click for everyone; Enter/Space keydown only for elements the
-   * browser does not natively activate (e.g. div[tabindex], [role=button]).
-   * Native buttons/links rely on their built-in Enter/Space→click, and text
-   * fields are never hijacked.
+   * Activation: click for everyone; Enter/Space keyboard activation only for
+   * elements the browser does not natively activate (e.g. div[tabindex],
+   * [role=button]). Native-like semantics: Enter fires on keydown (key
+   * repeats included), Space fires once on keyup — its keydown only prevents
+   * page scroll, and moving focus mid-press cancels the activation. Keys
+   * originating in nested native controls or editable text are ignored.
    */
   press(fn: (el: HTMLElement, ev: PressEvent) => void): this {
     return this._bind((el) => {
@@ -543,15 +546,41 @@ export class Handle {
         return () => el.removeEventListener('click', onClick);
       }
 
+      // isContentEditable also catches editability inherited from an
+      // ancestor, which no selector can see.
+      const fromNested = (ev: KeyboardEvent): boolean => {
+        const t = ev.target as HTMLElement;
+        return t !== el && (t.isContentEditable || !!t.closest?.(NATIVE_PRESS));
+      };
+      let spaceArmed = false;
       const onKeydown = (ev: KeyboardEvent) => {
-        if (ev.key !== 'Enter' && ev.key !== ' ') return;
-        ev.preventDefault(); // Space must not scroll the page
+        if (fromNested(ev)) return;
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          fn(el, ev);
+        } else if (ev.key === ' ') {
+          ev.preventDefault(); // no page scroll; activation waits for keyup
+          spaceArmed = true;
+        }
+      };
+      const onKeyup = (ev: KeyboardEvent) => {
+        if (ev.key !== ' ' || !spaceArmed) return;
+        spaceArmed = false;
+        if (fromNested(ev)) return;
+        ev.preventDefault();
         fn(el, ev);
       };
+      const onBlur = () => {
+        spaceArmed = false;
+      };
       el.addEventListener('keydown', onKeydown);
+      el.addEventListener('keyup', onKeyup);
+      el.addEventListener('blur', onBlur);
       return () => {
         el.removeEventListener('click', onClick);
         el.removeEventListener('keydown', onKeydown);
+        el.removeEventListener('keyup', onKeyup);
+        el.removeEventListener('blur', onBlur);
       };
     });
   }

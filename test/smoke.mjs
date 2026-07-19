@@ -114,10 +114,13 @@ assert(ae('same') === ae('same'), 'handles are cached singletons');
   const enter = new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
   div.dispatchEvent(enter);
   assert(fires === 1, 'Enter on div[tabindex] fires press');
-  const space = new dom.window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
-  div.dispatchEvent(space);
-  assert(fires === 2, 'Space on div[tabindex] fires press');
-  assert(space.defaultPrevented, 'Space keydown is preventDefault-ed (no page scroll)');
+  const spaceDown = new dom.window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+  div.dispatchEvent(spaceDown);
+  assert(fires === 1, 'Space keydown alone does not fire (native buttons activate on keyup)');
+  assert(spaceDown.defaultPrevented, 'Space keydown is preventDefault-ed (no page scroll)');
+  const spaceUp = new dom.window.KeyboardEvent('keyup', { key: ' ', bubbles: true, cancelable: true });
+  div.dispatchEvent(spaceUp);
+  assert(fires === 2, 'Space keyup fires press once');
   div.click();
   assert(fires === 3, 'click on div fires press');
 }
@@ -1221,6 +1224,63 @@ const fireInput = (node) => node.dispatchEvent(new dom.window.Event('input', { b
   await tick();
   assert(runs === 3, 'unchanged clamped value does not re-run the effect');
   d();
+}
+
+// --- R11: press ignores keys from nested native controls ----------------------
+{
+  const card = el('<div data-ae="r11-card" tabindex="0"><input class="inner"></div>');
+  const inner = card.querySelector('input');
+  await tick();
+  let fires = 0;
+  ae('r11-card').press(() => fires++);
+  const down = new dom.window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+  inner.dispatchEvent(down);
+  const up = new dom.window.KeyboardEvent('keyup', { key: ' ', bubbles: true, cancelable: true });
+  inner.dispatchEvent(up);
+  assert(fires === 0, 'Space in an input nested inside a press target does not fire');
+  assert(!down.defaultPrevented, 'nested-input Space keydown is not preventDefault-ed (typing works)');
+  const enter = new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+  inner.dispatchEvent(enter);
+  assert(fires === 0, 'Enter in a nested input does not fire the ancestor press');
+}
+
+// --- R12: press ignores keys from nested editable content ---------------------
+{
+  const card = el('<div data-ae="r12-card" tabindex="0"><p contenteditable="true">txt</p></div>');
+  const editable = card.querySelector('p');
+  await tick();
+  let fires = 0;
+  ae('r12-card').press(() => fires++);
+  editable.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  const down = new dom.window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+  editable.dispatchEvent(down);
+  assert(fires === 0 && !down.defaultPrevented, 'keys inside nested contenteditable are left alone');
+}
+
+// --- R13: Enter key repeat fires per keydown, like a native button ------------
+{
+  const div = el('<div data-ae="r13" tabindex="0"></div>');
+  await tick();
+  let fires = 0;
+  ae('r13').press(() => fires++);
+  div.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  div.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true, cancelable: true }));
+  assert(fires === 2, `held Enter keeps firing like a native button (got ${fires})`);
+}
+
+// --- R14: blur between Space keydown and keyup cancels the activation ---------
+{
+  const div = el('<div data-ae="r14" tabindex="0"></div>');
+  await tick();
+  let fires = 0;
+  ae('r14').press(() => fires++);
+  div.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+  div.dispatchEvent(new dom.window.Event('blur'));
+  div.dispatchEvent(new dom.window.KeyboardEvent('keyup', { key: ' ', bubbles: true, cancelable: true }));
+  assert(fires === 0, 'focus moving away mid-press cancels Space activation');
+  // Space held elsewhere and released over the element must not fire either.
+  div.dispatchEvent(new dom.window.KeyboardEvent('keyup', { key: ' ', bubbles: true, cancelable: true }));
+  assert(fires === 0, 'Space keyup without a prior armed keydown does not fire');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
