@@ -9,19 +9,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # GitHub release
-      id-token: write # npm provenance
+      id-token: write # npm trusted publishing (OIDC)
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: 'https://registry.npmjs.org'
       - run: bun install --frozen-lockfile
-      # prepublishOnly runs the test suite and builds dist + min
-      - run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # trusted publishing needs npm >= 11.5.1; Node 22 bundles npm 10
+      - run: npm install -g npm@latest
+      # prepublishOnly runs the test suite and builds dist + min;
+      # provenance is attached automatically under trusted publishing
+      - run: npm publish --access public
       - run: gh release create "$GITHUB_REF_NAME" --generate-notes || true # exists already? fine
         env:
           GH_TOKEN: ${{ github.token }}
