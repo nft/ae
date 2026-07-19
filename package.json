@@ -28,7 +28,11 @@
       "import": "./dist/ae.js",
       "default": "./dist/ae.js"
     },
-    "./min": "./dist/ae.min.js"
+    "./min": {
+      "types": "./dist/ae.d.ts",
+      "import": "./dist/ae.min.js",
+      "default": "./dist/ae.min.js"
+    }
   },
   "unpkg": "dist/ae.min.js",
   "jsdelivr": "dist/ae.min.js",
