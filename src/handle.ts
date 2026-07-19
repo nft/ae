@@ -9,7 +9,7 @@ import {
   type Reactive,
   type ReadableSignal,
 } from './reactivity.js';
-import { attach, selectorFor, type Binding } from './lifecycle.js';
+import { attach, observedRoots, selectorFor, type Binding } from './lifecycle.js';
 import { listRecords, scopedHandles, swapScopeCreated, type ListRecord } from './registry.js';
 
 // Elements the browser natively activates via keyboard (Enter/Space already
@@ -40,8 +40,17 @@ export class Handle {
 
   /** Plain array of currently matching elements (under root, if scoped). */
   get els(): HTMLElement[] {
-    const scope = this.root ?? document;
-    return Array.from(scope.querySelectorAll<HTMLElement>(selectorFor(this.name)));
+    const sel = selectorFor(this.name);
+    if (this.root) return Array.from(this.root.querySelectorAll<HTMLElement>(sel));
+    const out = Array.from(document.querySelectorAll<HTMLElement>(sel));
+    if (observedRoots.size > 0) {
+      // querySelectorAll cannot pierce shadow boundaries; roots opted in via
+      // ae.observe contribute their matches so bindings registered later
+      // still reach existing shadow content.
+      for (const r of observedRoots.keys()) out.push(...r.querySelectorAll<HTMLElement>(sel));
+      return [...new Set(out)];
+    }
+    return out;
   }
 
   /** Run fn over current elements once. Not reactive, not for future ones. */

@@ -3,7 +3,7 @@
 // No virtual DOM, no hydration, no templates.
 
 import { Computed, effect, isSignal, settled, Signal, transition } from './reactivity.js';
-import './lifecycle.js'; // starts the document observer on import
+import { observe } from './lifecycle.js'; // importing also starts the document observer
 import { Handle } from './handle.js';
 import { handles, listRecords, markScoped, scopeCreated, scopedHandles } from './registry.js';
 
@@ -11,6 +11,7 @@ export { Computed, effect, isSignal, settled, Signal, transition } from './react
 export type { Cleanup, Reactive, ReadableSignal } from './reactivity.js';
 export { Handle } from './handle.js';
 export type { PressEvent } from './handle.js';
+export { observe } from './lifecycle.js';
 
 /**
  * The current item of the .list-stamped node containing el — walks up to the
@@ -89,6 +90,7 @@ export const ae = Object.assign(
     isSignal,
     parts,
     itemOf,
+    observe,
     settled,
     transition,
   },

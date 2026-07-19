@@ -113,6 +113,76 @@ const OBSERVER_OPTS: MutationObserverInit = {
   attributeOldValue: true,
 };
 
+interface ObservedRoot {
+  mo: MutationObserver;
+  /** observe() calls minus disposals; the observer lives while refs > 0. */
+  refs: number;
+  /** Last known effective connectivity of the host, for the lifecycle sweep. */
+  hostConnected: boolean;
+}
+
+/** Shadow roots opted in via ae.observe, exported for Handle.els. */
+export const observedRoots = new Map<ShadowRoot, ObservedRoot>();
+
+/** Is node inside space some active observer watches (document tree, or a
+ * registered shadow root whose host chain is itself observed)? */
+function isObserved(node: Node): boolean {
+  for (let n: Node = node; ; ) {
+    const root = n.getRootNode();
+    if (root === n.ownerDocument) return true;
+    const entry = observedRoots.get(root as ShadowRoot);
+    if (!entry) return false;
+    n = (root as ShadowRoot).host;
+  }
+}
+
+// A ShadowRoot observer does NOT fire when its host leaves the document, and
+// the document observer cannot see into shadow trees — so every mutation
+// batch ends by re-checking each registered root's host connectivity and
+// mounting/unmounting its subtree on transitions.
+function sweepObservedRoots(): void {
+  for (const [root, entry] of observedRoots) {
+    const connected = root.host.isConnected && isObserved(root.host);
+    if (connected === entry.hostConnected) continue;
+    entry.hostConnected = connected;
+    if (connected) forEachMarked(root, (el) => mountElement(el));
+    else forEachMarked(root, unmountElement);
+  }
+}
+
+/**
+ * Watch a ShadowRoot for data-ae lifecycle — the document observer cannot
+ * pierce shadow boundaries, and neither can this (nested shadow roots each
+ * need their own observe call). Marked content already inside is mounted
+ * immediately if the host is connected; host removal/re-insertion unmounts
+ * and remounts the subtree. Observation is refcounted per root: the returned
+ * cleanup (idempotent per call) disconnects and unmounts once the last
+ * caller disposes.
+ */
+export function observe(root: ShadowRoot): Cleanup {
+  let entry = observedRoots.get(root);
+  if (entry) {
+    entry.refs++;
+  } else {
+    const mo = new MutationObserver(onMutations);
+    mo.observe(root, OBSERVER_OPTS);
+    entry = { mo, refs: 1, hostConnected: false };
+    observedRoots.set(root, entry);
+    entry.hostConnected = root.host.isConnected && isObserved(root.host);
+    if (entry.hostConnected) forEachMarked(root, (el) => mountElement(el));
+  }
+  const e = entry;
+  let disposed = false;
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    if (--e.refs > 0) return;
+    e.mo.disconnect();
+    observedRoots.delete(root);
+    forEachMarked(root, unmountElement);
+  };
+}
+
 function onMutations(records: MutationRecord[]): void {
   // The callback runs after ALL mutations settle, so element state
   // (isConnected, current attribute value) is final — act on net state,
@@ -127,7 +197,10 @@ function onMutations(records: MutationRecord[]): void {
     }
     for (const node of record.removedNodes) {
       forEachMarked(node, (el) => {
-        if (!el.isConnected) unmountElement(el); // reparented ≠ removed
+        // reparented ≠ removed — but composed-tree isConnected stays true for
+        // an element moved into an UNOBSERVED shadow root, where no observer
+        // covers it anymore, so that move must unmount too.
+        if (!el.isConnected || (observedRoots.size > 0 && !isObserved(el))) unmountElement(el);
       });
     }
     for (const node of record.addedNodes) {
@@ -145,6 +218,7 @@ function onMutations(records: MutationRecord[]): void {
     unmountElement(el);
     if (el.isConnected && current !== null) mountElement(el);
   }
+  if (observedRoots.size > 0) sweepObservedRoots();
 }
 
 function initObserver(): void {

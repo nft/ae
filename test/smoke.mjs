@@ -1404,5 +1404,160 @@ const fireInput = (node) => node.dispatchEvent(new dom.window.Event('input', { b
   assert(opts.map((o) => o.selected).join(',') === 'true,true,false', 'multi: duplicate values select together (set semantics)');
 }
 
+// ===========================================================================
+// ae.observe(): shadow root lifecycle
+// ===========================================================================
+
+// --- invisible before observe; existing content mounts on observe -------------
+{
+  const host = el('<div></div>');
+  const shadow = host.attachShadow({ mode: 'open' });
+  shadow.innerHTML = '<span data-ae="sh-a">x</span>';
+  const span = shadow.querySelector('span');
+  await tick();
+  const msg = ae.signal('bound');
+  ae('sh-a').text(msg);
+  await tick();
+  assert(span.textContent === 'x', 'shadow content is untouched before observe');
+  const stop = ae.observe(shadow);
+  assert(span.textContent === 'bound', 'observe mounts existing marked shadow content synchronously');
+
+  // --- late binding reaches shadow content via .els ---------------------------
+  ae('sh-a').cls('lit', true);
+  assert(span.classList.contains('lit'), 'a binding registered after observe reaches shadow content');
+  assert(ae('sh-a').els.filter((e) => e === span).length === 1, '.els includes the shadow element exactly once');
+
+  // --- additions inside the shadow root mount ---------------------------------
+  let mounts = 0;
+  let cleanups = 0;
+  ae('sh-b').mount(() => { mounts++; return () => cleanups++; });
+  const added = document.createElement('i');
+  added.setAttribute('data-ae', 'sh-b');
+  shadow.append(added);
+  await tick();
+  assert(mounts === 1, 'element added inside an observed shadow root mounts');
+
+  // --- rename inside the shadow root rebinds ----------------------------------
+  let renamed = 0;
+  ae('sh-b2').mount(() => { renamed++; });
+  added.setAttribute('data-ae', 'sh-b2');
+  await tick();
+  assert(renamed === 1 && cleanups === 1, `rename inside a shadow root rebinds (renamed=${renamed}, cleanups=${cleanups})`);
+
+  // --- removal runs cleanup ---------------------------------------------------
+  added.setAttribute('data-ae', 'sh-b');
+  await tick();
+  assert(mounts === 2, 'rename back remounts');
+  added.remove();
+  await tick();
+  assert(cleanups === 2, 'removal from an observed shadow root runs cleanup');
+
+  // --- host removal / re-insertion cycles the whole shadow subtree ------------
+  let hostMounts = 0;
+  let hostCleanups = 0;
+  ae('sh-a').mount(() => { hostMounts++; return () => hostCleanups++; });
+  assert(hostMounts === 1, 'mount binding attached to existing shadow content');
+  host.remove();
+  await tick();
+  assert(hostCleanups === 1, 'removing the HOST unmounts shadow descendants');
+  document.body.append(host);
+  await tick();
+  assert(hostMounts === 2, 're-inserting the host remounts shadow descendants');
+
+  // --- disposer tears down and is idempotent ----------------------------------
+  stop();
+  assert(hostCleanups === 2, 'disposing the observation unmounts the subtree');
+  stop(); // second call must be a no-op
+  const late = document.createElement('b');
+  late.setAttribute('data-ae', 'sh-b');
+  shadow.append(late);
+  await tick();
+  assert(mounts === 2, 'content added after disposal does not mount');
+  assert(ae('sh-a').els.length === 0, '.els no longer includes disposed shadow content');
+  host.remove();
+  await tick();
+}
+
+// --- move from an observed to an UNOBSERVED shadow root unmounts ---------------
+{
+  const hostA = el('<div></div>');
+  const hostB = el('<div></div>');
+  const shadowA = hostA.attachShadow({ mode: 'open' });
+  const shadowB = hostB.attachShadow({ mode: 'open' });
+  await tick();
+  const stop = ae.observe(shadowA);
+  let mounts = 0;
+  let cleanups = 0;
+  ae('sh-move').mount(() => { mounts++; return () => cleanups++; });
+  const node = document.createElement('span');
+  node.setAttribute('data-ae', 'sh-move');
+  shadowA.append(node);
+  await tick();
+  assert(mounts === 1, 'mounted in the observed root');
+  shadowB.append(node); // still isConnected via hostB — but nobody watches shadowB
+  await tick();
+  assert(cleanups === 1, 'moving into an unobserved shadow root unmounts despite isConnected');
+  stop();
+  hostA.remove();
+  hostB.remove();
+  await tick();
+}
+
+// --- move BETWEEN two observed roots keeps net-state (no remount) --------------
+{
+  const hostA = el('<div></div>');
+  const hostB = el('<div></div>');
+  const shadowA = hostA.attachShadow({ mode: 'open' });
+  const shadowB = hostB.attachShadow({ mode: 'open' });
+  await tick();
+  const stopA = ae.observe(shadowA);
+  const stopB = ae.observe(shadowB);
+  let mounts = 0;
+  let cleanups = 0;
+  ae('sh-between').mount(() => { mounts++; return () => cleanups++; });
+  const node = document.createElement('span');
+  node.setAttribute('data-ae', 'sh-between');
+  shadowA.append(node);
+  await tick();
+  shadowB.append(node); // move within observed space
+  await tick();
+  assert(mounts === 1 && cleanups === 0, `move between observed roots is invisible (mounts=${mounts}, cleanups=${cleanups})`);
+  node.remove();
+  await tick();
+  assert(cleanups === 1, 'real removal still cleans up after the move');
+  stopA();
+  stopB();
+  hostA.remove();
+  hostB.remove();
+  await tick();
+}
+
+// --- refcounting: observation lives until the LAST caller disposes -------------
+{
+  const host = el('<div></div>');
+  const shadow = host.attachShadow({ mode: 'open' });
+  shadow.innerHTML = '<span data-ae="sh-ref"></span>';
+  await tick();
+  let mounts = 0;
+  let cleanups = 0;
+  ae('sh-ref').mount(() => { mounts++; return () => cleanups++; });
+  const stop1 = ae.observe(shadow);
+  const stop2 = ae.observe(shadow);
+  assert(mounts === 1, 'second observe() of the same root does not double-mount');
+  stop1();
+  assert(cleanups === 0, 'first disposer leaves the observation alive for the other caller');
+  const late = document.createElement('i');
+  late.setAttribute('data-ae', 'sh-ref');
+  shadow.append(late);
+  await tick();
+  assert(mounts === 2, 'still observing after one of two disposals');
+  stop1(); // double-dispose of the same cleanup must not steal the last ref
+  assert(cleanups === 0, 'double-calling one disposer is a no-op');
+  stop2();
+  assert(cleanups === 2, 'last disposer tears the observation down');
+  host.remove();
+  await tick();
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
