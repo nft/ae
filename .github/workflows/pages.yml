@@ -41,13 +41,15 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build && bun run min
 
-      # site/index.html becomes the site root: its ../ asset paths flatten to ./
+      # site/*.html become the site root: their ../ asset paths flatten to ./
       - name: Assemble site
         run: |
           mkdir _site
-          sed 's|\.\./|./|g' site/index.html > _site/index.html
+          for page in site/*.html; do
+            sed 's|\.\./|./|g' "$page" > "_site/$(basename "$page")"
+          done
           cp -R dist examples _site/
-          cp site/logo.svg site/tailwind.css _site/
+          cp site/logo.svg site/tailwind.css site/hl.js site/docs.js _site/
           cp API.md README.md LICENSE llms.txt _site/
           touch _site/.nojekyll
 

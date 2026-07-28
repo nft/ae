@@ -9,6 +9,12 @@ type declarations. `npm run build` → `dist/*.js` + declarations (entry
 runs the Playwright suite, `npm run serve` hosts the site at
 `site/index.html`.
 
+This file is the prose spec. The same surface, member by member, with worked
+examples and live demos, is the reference site: `site/reference.html`
+(handles & lifecycle), `site/reactivity.html`, `site/bindings.html`,
+`site/forms.html`, `site/lists.html` — deployed at
+<https://nft.github.io/ae/reference.html>.
+
 ```html
 <button data-ae="save">Save</button>
 <span data-ae="status"></span>

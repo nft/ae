@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Handles &amp; lifecycle — ae reference</title>
+  <meta name="description" content="The ae reference: the data-ae markup contract, live handles, scoped handles, .mount, .scope, .els, .each, ae.parts, ae.itemOf, ae.observe, and the lifecycle guarantees behind them.">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Committed static build (theme + @apply utilities live in
+       site/tailwind.config.js and site/tailwind.in.css).
+       Regenerate after class changes: bun run site:css -->
+  <link rel="stylesheet" href="tailwind.css">
+</head>
+<body class="overflow-x-clip bg-cream font-sans text-ink antialiased">
+
+  <!-- ===== nav ===== -->
+  <nav class="sticky top-0 z-10 border-b border-stone-200/70 bg-cream/85 backdrop-blur">
+    <div class="mx-auto flex max-w-none items-center gap-6 px-6 py-3 xl:px-12">
+      <a href="index.html" class="flex items-center gap-2.5 font-display text-2xl font-semibold tracking-tight text-ink transition-colors hover:text-[#a41821]">
+        <img src="logo.svg" alt="" class="h-8 w-[2.8rem]">
+        <span>ae</span>
+      </a>
+      <span class="hidden rounded-full border border-amber-700/25 bg-amber-700/5 px-2.5 py-0.5 font-mono text-[11px] text-amber-800 sm:inline">reference</span>
+      <div class="ml-auto flex items-baseline gap-6 text-sm text-stone-500">
+        <a href="index.html#cases" class="hidden transition hover:text-ink sm:inline">Tour</a>
+        <a href="index.html#kanban" class="hidden transition hover:text-ink sm:inline">Kanban</a>
+        <a href="https://www.npmjs.com/package/@aeroapp/ae" class="hidden transition hover:text-ink sm:inline">npm</a>
+        <a href="https://github.com/nft/ae" class="transition hover:text-ink">GitHub</a>
+        <a href="../API.md" class="rounded-lg border border-stone-300 px-3 py-1.5 font-medium text-stone-700 transition hover:border-amber-700 hover:text-amber-800">API.md</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="mx-auto grid max-w-none gap-x-12 px-6 pb-16 pt-10 xl:px-12 lg:grid-cols-[15rem_minmax(0,1fr)]">
+
+    <!-- ===== page ===== -->
+    <main class="min-w-0 max-w-3xl space-y-12">
+      <header>
+        <span class="doc-eyebrow">reference · 1 of 5</span>
+        <h1 class="mt-3 font-display text-4xl font-medium tracking-tight">Handles &amp; lifecycle</h1>
+        <p class="mt-4 text-lg leading-relaxed text-stone-600">Everything in ae starts with a handle: you name elements in HTML with one attribute, ask for that name in JavaScript, and attach behavior to it. This page covers how a handle finds elements — now and later — how scoped handles keep identical names from colliding, how setup and teardown are paired, and the lifecycle rules the rest of the API rests on.</p>
+        <div class="mt-6 flex flex-wrap gap-2">
+          <a href="#handle" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae(name)</a>
+          <a href="#handle-scoped" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae(name, root)</a>
+          <a href="#mount" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.mount</a>
+          <a href="#scope" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.scope</a>
+          <a href="#els" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.els</a>
+          <a href="#each" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.each</a>
+          <a href="#parts" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae.parts</a>
+          <a href="#item-of" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae.itemOf</a>
+          <a href="#observe" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae.observe</a>
+          <a href="#semantics" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">Semantics</a>
+        </div>
+      </header>
+
+      <!-- ===== the markup contract ===== -->
+      <section id="markup" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">The markup contract</h2>
+        <p class="mt-3 leading-relaxed text-stone-600">One attribute: <code class="doc-code">data-ae="name"</code>. Names are free-form strings — no registry, no naming scheme, no reserved words — and the same name may appear on any number of elements. A handle is the set of all of them, so <code class="doc-code">ae('row')</code> means "every row", not "the row".</p>
+        <p class="mt-3 leading-relaxed text-stone-600">Nothing else in your HTML changes. There is no template syntax, no build step, and no hydration pass: the elements the browser parsed are the elements ae binds to, and <code class="doc-code">view-source</code> still shows the app.</p>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;button data-ae="save"&gt;Save&lt;/button&gt;
+&lt;span data-ae="status"&gt;&lt;/span&gt;
+
+// npm i @aeroapp/ae — or, with no tooling at all:
+// import { ae } from 'https://esm.sh/@aeroapp/ae';
+import { ae } from '@aeroapp/ae';
+
+const saves = ae.signal(0);
+
+ae('status').text(() =&gt; saves.value ? `saved ${saves.value}×` : 'never saved');
+ae('save').press(() =&gt; saves.value++);</code></pre>
+
+        <p class="mt-5 leading-relaxed text-stone-600">That is a complete ae app. The rest of this reference is the same two moves — name an element, attach behavior — applied to <a class="doc-link" href="reactivity.html#signal">signals</a>, <a class="doc-link" href="bindings.html#render">rendering</a>, <a class="doc-link" href="forms.html#input">forms</a> and <a class="doc-link" href="lists.html#list">lists</a>.</p>
+      </section>
+
+      <!-- ===== ae(name) ===== -->
+      <section id="handle" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">ae(name) → Handle</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Returns the <strong class="font-semibold text-ink">live</strong> handle for every element carrying <code class="doc-code">data-ae="name"</code> — the ones in the document now and any connected later. Liveness is not per handle: a single <code class="doc-code">MutationObserver</code> on <code class="doc-code">document.body</code> drives every mount, cleanup and <code class="doc-code">data-ae</code> rename on the page, however many names you use.</p>
+        <p class="mt-3 leading-relaxed text-stone-600">Handles are cached per name, so <code class="doc-code">ae('x') === ae('x')</code>. Every method returns the handle, so everything chains, and callbacks always receive the element first — <code class="doc-code">fn(el, …)</code> — which is what lets one handle serve many elements without you tracking any of them.</p>
+
+        <div class="doc-sig mt-5">ae(name: string): Handle</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">name</dt><dd class="text-stone-600">the <code class="doc-code">data-ae</code> value to match; any string, quotes and newlines included</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the cached <code class="doc-code">Handle</code> for that name</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;button data-ae="save"&gt;Save&lt;/button&gt;
+&lt;button data-ae="save"&gt;Save and close&lt;/button&gt;
+
+const saves = ae.signal(0);
+
+ae('save')                       // one handle, both buttons
+  .press(() =&gt; saves.value++)    // methods chain …
+  .cls('ready', true);           // … and each call appends a binding
+
+ae('save') === ae('save');       // true — cached per name</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — binding methods <em>append</em>. Calling <code class="doc-code">.press</code> twice on the same handle attaches two listeners, and every matching element gets both. Wire each name once at startup; if the setup has to re-run because its root comes and goes, that is what <a class="doc-link" href="reference.html#scope">.scope</a> is for.</div>
+
+        <div class="doc-card mt-6">
+          <p class="font-mono text-[10px] uppercase tracking-widest text-amber-700">live</p>
+          <p class="mt-2 text-sm leading-relaxed text-stone-600">The <code class="doc-code">r-chip</code> bindings below were registered before a single chip existed. Append one and it binds itself; click a chip to remove it and its mount cleanup runs.</p>
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button data-ae="r-add" class="demo-btn">Append a chip</button>
+            <span data-ae="r-tally" class="font-mono text-xs text-stone-500"></span>
+          </div>
+          <div data-ae="r-shelf" class="mt-3 flex flex-wrap gap-2"></div>
+        </div>
+      </section>
+
+      <!-- ===== ae(name, root) ===== -->
+      <section id="handle-scoped" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">ae(name, root) → Handle</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">The same live handle, restricted to <strong class="font-semibold text-ink">descendants</strong> of <code class="doc-code">root</code>. The root element itself never matches, even when it carries the same name — the same rule <a class="doc-link" href="reference.html#parts">ae.parts</a> follows.</p>
+        <p class="mt-3 leading-relaxed text-stone-600">Global and scoped handles compose rather than compete: an element inside <code class="doc-code">root</code> receives the bindings of <code class="doc-code">ae('x')</code> <em>and</em> of <code class="doc-code">ae('x', root)</code>. Nested scopes stack the same way, innermost first. Scoped handles are cached per <code class="doc-code">(root, name)</code> pair, so <code class="doc-code">ae('x', r) === ae('x', r)</code> while <code class="doc-code">ae('x', r) !== ae('x')</code>.</p>
+
+        <div class="doc-sig mt-5">ae(name: string, root: HTMLElement): Handle</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">name</dt><dd class="text-stone-600">the <code class="doc-code">data-ae</code> value to match</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">root</dt><dd class="text-stone-600">the element to look inside; only its descendants match</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the <code class="doc-code">Handle</code> cached for that <code class="doc-code">(root, name)</code></dd></div>
+        </dl>
+
+        <p class="mt-5 leading-relaxed text-stone-600">The point is per-container behavior without global name collisions. Scope to the container, and recover which item a handler fired for with <a class="doc-link" href="reference.html#item-of">ae.itemOf</a> instead of stamping keys into the DOM:</p>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;ul data-ae="todos"&gt;
+  &lt;template&gt;&lt;li&gt;&lt;b data-ae="title"&gt;&lt;/b&gt; &lt;button data-ae="remove"&gt;×&lt;/button&gt;&lt;/li&gt;&lt;/template&gt;
+&lt;/ul&gt;
+
+ae('todos').scope((list) =&gt; {            // once per container
+  ae('remove', list).press((btn) =&gt; {    // only buttons inside THIS list
+    const todo = ae.itemOf(btn);
+    todos.value = todos.value.filter((t) =&gt; t.id !== todo.id);
+  });
+});</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — set a scoped handle up <em>once per root</em>. Handles are cached and bindings append, so re-running the same setup for the same root stacks duplicates. Never create scoped handles inside a <a class="doc-link" href="lists.html#list">.list</a> render callback (it re-runs on every item change) or in a bare <code class="doc-code">.mount</code> of a root that can be removed and re-added — use <a class="doc-link" href="reference.html#scope">.scope</a>, which retires what it created.</div>
+
+        <div class="doc-note mt-4"><strong class="font-semibold text-amber-900">Gotcha</strong> — moving an element out of the scope does not unbind it. <a class="doc-link" href="reference.html#semantics">Net-state lifecycle</a> means moves never remount, so an element reparented outside <code class="doc-code">root</code> keeps its scoped bindings until it actually leaves the DOM or is renamed. Remove and re-insert it if you need a rebind.</div>
+      </section>
+
+      <!-- ===== .mount ===== -->
+      <section id="mount" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.mount(fn)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Runs <code class="doc-code">fn(el)</code> exactly once per matching element — synchronously for elements already connected when you call it, and later for any element connected afterwards. If <code class="doc-code">fn</code> returns a function, that function is the cleanup and runs when the element leaves the DOM. Re-adding the element runs <code class="doc-code">fn</code> again.</p>
+        <p class="mt-3 leading-relaxed text-stone-600">This is the pairing point for anything the DOM cannot clean up for you: timers, observers, third-party widgets, subscriptions. Unlike <a class="doc-link" href="bindings.html#render">.render</a>, signal reads inside <code class="doc-code">fn</code> are not tracked — <code class="doc-code">.mount</code> is setup, not rendering.</p>
+
+        <div class="doc-sig mt-5">.mount(fn: (el: HTMLElement) =&gt; Cleanup | void): this</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">fn</dt><dd class="text-stone-600">setup for one element; may return a <code class="doc-code">Cleanup</code> (<code class="doc-code">() =&gt; void</code>)</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the handle, for chaining</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;time data-ae="clock"&gt;&lt;/time&gt;
+
+ae('clock').mount((el) =&gt; {
+  const tick = () =&gt; el.textContent = new Date().toLocaleTimeString();
+  tick();
+  const id = setInterval(tick, 1000);
+  return () =&gt; clearInterval(id);   // runs when this element leaves the DOM
+});</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Guarantee</strong> — a binding that throws is caught, logged as <code class="doc-code">[ae] binding threw:</code>, and isolated: the element's other bindings still attach, and every other element still mounts. A cleanup that throws is logged as <code class="doc-code">[ae] cleanup threw:</code>, and the remaining cleanups still run.</div>
+      </section>
+
+      <!-- ===== .scope ===== -->
+      <section id="scope" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.scope(fn)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Like <a class="doc-link" href="reference.html#mount">.mount</a>, but built for per-root setup that creates <a class="doc-link" href="reference.html#handle-scoped">scoped handles</a>. Scoped handles first created inside <code class="doc-code">fn</code> — synchronously, during the call — are retired when the root unmounts, so a remount re-runs <code class="doc-code">fn</code> against fresh handles instead of stacking a second set of bindings onto cached ones.</p>
+        <p class="mt-3 leading-relaxed text-stone-600">That makes it the answer to "same component, many instances, private state". Each root gets its own signals in a closure and its own scoped handles; identical <code class="doc-code">data-ae</code> names inside two roots never see each other.</p>
+
+        <div class="doc-sig mt-5">.scope(fn: (el: HTMLElement) =&gt; Cleanup | void): this</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">fn</dt><dd class="text-stone-600">setup for one root; may return a <code class="doc-code">Cleanup</code> that runs first at teardown</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the handle, for chaining</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;div data-ae="board"&gt;
+  &lt;template&gt;
+    &lt;section data-ae="column"&gt;
+      &lt;div data-ae="cards"&gt;&lt;template&gt;
+        &lt;article data-ae="card"&gt;&lt;b data-ae="card-title"&gt;&lt;/b&gt; &lt;button data-ae="card-del"&gt;×&lt;/button&gt;&lt;/article&gt;
+      &lt;/template&gt;&lt;/div&gt;
+    &lt;/section&gt;
+  &lt;/template&gt;
+&lt;/div&gt;
+
+ae('column').scope((colEl) =&gt; {                  // once per stamped column
+  const { id } = ae.itemOf(colEl);               // which column is this?
+  const mine = ae.computed(() =&gt; cards.value.filter((c) =&gt; c.col === id));
+
+  ae('cards', colEl).list(mine, renderCard, (c) =&gt; c.id);
+  ae('card-del', colEl).press((btn) =&gt; remove(ae.itemOf(btn)));
+});</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Fine print</strong> — only handles whose <code class="doc-code">(root, name)</code> map is <em>first created</em> inside <code class="doc-code">fn</code> are retired; a scoped map that already existed elsewhere survives the teardown untouched. The collection window is the synchronous run of <code class="doc-code">fn</code>, so scoped handles created later from a timer or a promise are not retired. A returned cleanup runs first, and the retirement happens even if that cleanup throws.</div>
+
+        <div class="doc-card mt-6">
+          <p class="font-mono text-[10px] uppercase tracking-widest text-amber-700">live</p>
+          <p class="mt-2 text-sm leading-relaxed text-stone-600">Two roots, identical inner names (<code class="doc-code">r-score</code>, <code class="doc-code">r-bump</code>), one setup function — and a private count each.</p>
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <div data-ae="r-panel" class="rounded-xl border border-stone-200 p-4">
+              <p class="font-mono text-[11px] uppercase tracking-widest text-stone-400">panel A</p>
+              <div class="mt-2 flex flex-wrap items-center gap-3">
+                <span data-ae="r-score" class="font-display text-2xl"></span>
+                <button data-ae="r-bump" class="demo-btn">+1</button>
+                <button data-ae="r-reset" class="demo-btn">reset</button>
+              </div>
+            </div>
+            <div data-ae="r-panel" class="rounded-xl border border-stone-200 p-4">
+              <p class="font-mono text-[11px] uppercase tracking-widest text-stone-400">panel B</p>
+              <div class="mt-2 flex flex-wrap items-center gap-3">
+                <span data-ae="r-score" class="font-display text-2xl"></span>
+                <button data-ae="r-bump" class="demo-btn">+1</button>
+                <button data-ae="r-reset" class="demo-btn">reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== .els ===== -->
+      <section id="els" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.els</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">A plain array of the elements matching right now — an escape hatch to the raw DOM. An unscoped handle also includes matches inside shadow roots opted in via <a class="doc-link" href="reference.html#observe">ae.observe</a>, each element exactly once, because <code class="doc-code">querySelectorAll</code> alone cannot pierce a shadow boundary. A scoped handle contains only descendants of its root — the shadow-root merge applies to unscoped handles alone.</p>
+
+        <div class="doc-sig mt-5">get els(): HTMLElement[]</div>
+
+        <pre class="doc-pre mt-5"><code class="hl">const rows = ae('row').els;      // snapshot: a real Array, taken now
+rows.length;
+rows.at(-1)?.scrollIntoView();
+
+// the usual reason to reach for it: get a root to scope to
+const list = ae('todos').els[0];
+ae('remove', list).press((btn) =&gt; remove(ae.itemOf(btn)));</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — <code class="doc-code">.els</code> is a snapshot, not a live collection and not reactive: it is computed on every read and never notifies anyone. For "every element, now and in the future", use <a class="doc-link" href="reference.html#mount">.mount</a> or <a class="doc-link" href="bindings.html#render">.render</a>. Read straight after inserting markup it does list the new elements — but their bindings have not attached yet, because the observer delivers on a microtask, after your code returns; <a class="doc-link" href="reactivity.html#settled">await ae.settled()</a> when you need both.</div>
+      </section>
+
+      <!-- ===== .each ===== -->
+      <section id="each" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.each(fn)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Runs <code class="doc-code">fn(el)</code> over <a class="doc-link" href="reference.html#els">.els</a> once and returns the handle, so it drops into a chain. It is the imperative twin of <code class="doc-code">.mount</code>: one pass over the elements that exist at this moment, no bookkeeping, no cleanup.</p>
+
+        <div class="doc-sig mt-5">.each(fn: (el: HTMLElement) =&gt; void): this</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">fn</dt><dd class="text-stone-600">called once per currently matching element</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the handle, for chaining</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">let renders = 0;
+
+ae('count').render((el) =&gt; {
+  renders++;
+  el.textContent = count.value;
+  ae('renders').each((r) =&gt; r.textContent = renders);   // write, don't bind
+});</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — one shot. <code class="doc-code">.each</code> is not reactive and does not apply to elements added later; it is safe to call from inside a render or an event handler precisely because it registers nothing.</div>
+      </section>
+
+      <!-- ===== ae.parts ===== -->
+      <section id="parts" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">ae.parts(root)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Named lookup of the <code class="doc-code">data-ae</code> descendants of one element: <code class="doc-code">ae.parts(el).title</code> instead of <code class="doc-code">el.querySelector('[data-ae="title"]')</code>. The root itself is not a part, and on duplicate names the first match in document order wins.</p>
+        <p class="mt-3 leading-relaxed text-stone-600">The map is cached per root, which is what makes it cheap inside a <a class="doc-link" href="lists.html#list">.list</a> render callback that re-runs on every item change. Part elements are ordinary elements — they still participate in global handles, so <code class="doc-code">ae('title')</code> binds all of them; <code class="doc-code">ae.parts</code> only gives you scoped access.</p>
+
+        <div class="doc-sig mt-5">ae.parts(root: HTMLElement): Record&lt;string, HTMLElement&gt;</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">root</dt><dd class="text-stone-600">the element to look inside — typically a template-stamped node</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">a null-prototype object mapping each <code class="doc-code">data-ae</code> name to its first element</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;ul data-ae="todos"&gt;
+  &lt;template&gt;&lt;li&gt;&lt;b data-ae="title"&gt;&lt;/b&gt; &lt;i data-ae="due"&gt;&lt;/i&gt;&lt;/li&gt;&lt;/template&gt;
+&lt;/ul&gt;
+
+ae('todos').list(todos, (li, todo, i) =&gt; {
+  const p = ae.parts(li);           // cached: built once per stamped node
+  p.title.textContent = `${i + 1}. ${todo.text}`;
+  p.due.textContent = todo.due;
+}, (todo) =&gt; todo.id);</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — because the map is cached, it is for subtrees with static structure. If you add, remove or replace marked descendants of a root yourself, its cached map goes stale; query that subtree directly instead.</div>
+
+        <div class="doc-card mt-6">
+          <p class="font-mono text-[10px] uppercase tracking-widest text-amber-700">live</p>
+          <p class="mt-2 text-sm leading-relaxed text-stone-600">This card reports its own parts map, filled through that map at mount.</p>
+          <div data-ae="r-badge" class="mt-4 rounded-xl border border-stone-200 p-4">
+            <p class="font-mono text-[11px] uppercase tracking-widest text-stone-400">keys of ae.parts(root)</p>
+            <p data-ae="r-badge-keys" class="mt-1 font-mono text-[13px] text-amber-900"></p>
+            <p class="mt-3 font-mono text-[11px] uppercase tracking-widest text-stone-400">'r-badge' in parts — is the root itself a part?</p>
+            <p data-ae="r-badge-root" class="mt-1 font-mono text-[13px] text-amber-900"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== ae.itemOf ===== -->
+      <section id="item-of" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">ae.itemOf(el)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">The current <a class="doc-link" href="lists.html#list">.list</a> item of the stamped node containing <code class="doc-code">el</code>. It walks up from <code class="doc-code">el</code> — the element itself counts — to the nearest stamped node, so nested lists resolve to the innermost item. Outside any stamped node, or once the item has been removed, it returns <code class="doc-code">undefined</code>.</p>
+        <p class="mt-3 leading-relaxed text-stone-600">This is how event handlers answer "which item was clicked" without stamping ids into the DOM: no <code class="doc-code">data-id</code> attributes, no parsing them back, no lookup table.</p>
+
+        <div class="doc-sig mt-5">ae.itemOf&lt;T = unknown&gt;(el: HTMLElement): T | undefined</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">el</dt><dd class="text-stone-600">any element inside a stamped node (or the stamped node itself)</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the item currently rendered by that node, or <code class="doc-code">undefined</code></dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">ae('remove').press((btn) =&gt; {
+  const todo = ae.itemOf(btn);
+  todos.value = todos.value.filter((t) =&gt; t.id !== todo.id);
+});
+
+// nested lists: a card's handler gets the card, not the column
+ae('card-del').press((btn) =&gt; remove(ae.itemOf(btn)));</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Note</strong> — the read is <em>tracked</em>. Called inside a <code class="doc-code">.render</code>, a <code class="doc-code">.list</code> render callback or an <a class="doc-link" href="reactivity.html#effect">ae.effect</a>, it re-runs that effect when the node's item is replaced by key. Called from an event handler it is a plain read, like every other read in a handler.</div>
+      </section>
+
+      <!-- ===== ae.observe ===== -->
+      <section id="observe" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">ae.observe(root) → dispose</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Extends liveness into a shadow tree. The document observer cannot pierce shadow boundaries — and neither can this one: nested shadow roots each need their own call. Marked content already inside mounts immediately if the host is connected, additions and <code class="doc-code">data-ae</code> renames inside the root behave exactly as they do in the document, removing the host unmounts the subtree, and re-inserting it remounts.</p>
+
+        <div class="doc-sig mt-5">ae.observe(root: ShadowRoot): Cleanup</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">root</dt><dd class="text-stone-600">the <code class="doc-code">ShadowRoot</code> to watch (open or closed — you hold the reference)</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">a <code class="doc-code">Cleanup</code> that releases this call's reference</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">class UserCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' }).innerHTML = '&lt;b data-ae="uc-name"&gt;&lt;/b&gt;';
+  }
+  connectedCallback() {
+    this.stop = ae.observe(this.shadowRoot);   // marked content mounts now
+  }
+  disconnectedCallback() {
+    this.stop();                               // releases this reference
+  }
+}</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Note</strong> — observation is refcounted per root: two calls for the same root share one observer and do not double-mount. Each disposer is idempotent and only releases its own reference; the observer disconnects and the subtree unmounts when the last one runs.</div>
+
+        <div class="doc-note mt-4"><strong class="font-semibold text-amber-900">Gotcha</strong> — moving an element from an observed shadow root into an <em>unobserved</em> one unmounts it, even though <code class="doc-code">isConnected</code> stays <code class="doc-code">true</code>: nothing watches it there any more. Moves between two observed roots are ordinary moves and do not remount.</div>
+      </section>
+
+      <!-- ===== semantics ===== -->
+      <section id="semantics" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">Semantics you can lean on</h2>
+        <p class="mt-3 leading-relaxed text-stone-600">The rules every member on every page of this reference obeys. They are what make adding the attribute safe at scale.</p>
+
+        <div class="mt-6 grid gap-4 sm:grid-cols-2">
+          <div class="doc-card">
+            <h3 class="font-medium">Liveness</h3>
+            <p class="mt-1.5 text-sm leading-relaxed text-stone-600">One <code class="doc-code">MutationObserver</code> on <code class="doc-code">document.body</code> powers mounts, cleanups, late elements and <code class="doc-code">data-ae</code> attributes added, removed or renamed after insertion — plus one observer per shadow root opted in via <code class="doc-code">ae.observe</code>. No per-handle observers.</p>
+          </div>
+          <div class="doc-card">
+            <h3 class="font-medium">Batching</h3>
+            <p class="mt-1.5 text-sm leading-relaxed text-stone-600">Signal writes coalesce per microtask; each affected <code class="doc-code">.render</code> or effect runs at most once per flush. Three writes in one handler produce one re-render.</p>
+          </div>
+          <div class="doc-card">
+            <h3 class="font-medium">Absolute disposal</h3>
+            <p class="mt-1.5 text-sm leading-relaxed text-stone-600">When an element leaves the DOM its mount cleanups run, its render effects are disposed and its listeners are removed. A disposed effect never runs again, even if it was already queued for the current flush. Re-adding the element re-binds everything.</p>
+          </div>
+          <div class="doc-card">
+            <h3 class="font-medium">Net-state lifecycle</h3>
+            <p class="mt-1.5 text-sm leading-relaxed text-stone-600">Mount and cleanup reflect the <em>net</em> DOM change per task, not intermediate mutations: moving a connected element does not remount it, renaming <code class="doc-code">data-ae</code> a→b→a is a no-op, and several renames in one task bind the final name exactly once.</p>
+          </div>
+          <div class="doc-card">
+            <h3 class="font-medium">Fault isolation</h3>
+            <p class="mt-1.5 text-sm leading-relaxed text-stone-600">A throwing binding, cleanup or effect <em>re-run</em> is logged with <code class="doc-code">console.error</code> and never stops the others. The one exception: an <a class="doc-link" href="reactivity.html#effect">ae.effect</a> whose <em>initial</em> run throws propagates to the caller and leaves no trace. Element bindings are always isolated, first run included.</p>
+          </div>
+          <div class="doc-card">
+            <h3 class="font-medium">Runaway guard</h3>
+            <p class="mt-1.5 text-sm leading-relaxed text-stone-600">An effect that writes a signal it also reads trips a circuit breaker after 100 flush cycles — the queue is cleared and one <code class="doc-code">console.error</code> names the cause — instead of hanging the tab.</p>
+          </div>
+          <div class="doc-card sm:col-span-2">
+            <h3 class="font-medium">Templating stays native</h3>
+            <p class="mt-1.5 text-sm leading-relaxed text-stone-600"><a class="doc-link" href="lists.html#list">.list</a> stamps a real <code class="doc-code">&lt;template&gt;</code> element: no template syntax, no virtual DOM, and reconciliation is keyed node reuse over the nodes the browser already has. Everything ae renders is markup you could have written by hand.</p>
+          </div>
+        </div>
+
+      </section>
+
+      <nav class="flex flex-wrap items-center justify-between gap-4 border-t border-stone-200/70 pt-8 font-medium">
+        <a class="doc-link" href="index.html">&larr; The tour</a>
+        <a class="doc-link" href="reactivity.html">Signals &amp; scheduling &rarr;</a>
+      </nav>
+    </main>
+
+    <!-- ===== sidebar (source order after main so mobile reads content first) ===== -->
+    <aside class="mt-16 border-t border-stone-200/70 pt-8 text-sm lg:sticky lg:top-[57px] lg:order-first lg:mt-0 lg:max-h-[calc(100vh-57px)] lg:self-start lg:overflow-y-auto lg:border-0 lg:pb-10 lg:pt-8">
+      <nav aria-label="API reference">
+        <p class="px-2 font-mono text-[11px] uppercase tracking-widest text-stone-400">Every member</p>
+
+        <a href="reference.html" class="mt-4 block px-2 font-medium text-amber-800" aria-current="page">Handles &amp; lifecycle</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="reference.html#handle">ae(name)</a></li>
+          <li><a class="doc-toc" href="reference.html#handle-scoped">ae(name, root)</a></li>
+          <li><a class="doc-toc" href="reference.html#mount">.mount(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#scope">.scope(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#els">.els</a></li>
+          <li><a class="doc-toc" href="reference.html#each">.each(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#parts">ae.parts(root)</a></li>
+          <li><a class="doc-toc" href="reference.html#item-of">ae.itemOf(el)</a></li>
+          <li><a class="doc-toc" href="reference.html#observe">ae.observe(root)</a></li>
+          <li><a class="doc-toc" href="reference.html#semantics">Semantics</a></li>
+        </ul>
+
+        <a href="reactivity.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Signals &amp; scheduling</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="reactivity.html#signal">ae.signal(v)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#signal-value">Signal.value</a></li>
+          <li><a class="doc-toc" href="reactivity.html#computed">ae.computed(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#effect">ae.effect(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#is-signal">ae.isSignal(v)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#settled">ae.settled()</a></li>
+          <li><a class="doc-toc" href="reactivity.html#transition">ae.transition(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#reactive-type">Reactive&lt;T&gt;</a></li>
+          <li><a class="doc-toc" href="reactivity.html#tracking">Tracking rules</a></li>
+        </ul>
+
+        <a href="bindings.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Rendering &amp; events</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="bindings.html#render">.render(fn)</a></li>
+          <li><a class="doc-toc" href="bindings.html#text">.text(v)</a></li>
+          <li><a class="doc-toc" href="bindings.html#cls">.cls(name, on?)</a></li>
+          <li><a class="doc-toc" href="bindings.html#attr">.attr(name, v)</a></li>
+          <li><a class="doc-toc" href="bindings.html#show">.show(on)</a></li>
+          <li><a class="doc-toc" href="bindings.html#press">.press(fn)</a></li>
+          <li><a class="doc-toc" href="bindings.html#hover">.hover(enter, leave)</a></li>
+          <li><a class="doc-toc" href="bindings.html#on">.on(type, fn, opts)</a></li>
+        </ul>
+
+        <a href="forms.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Forms</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="forms.html#input">.input(signal)</a></li>
+          <li><a class="doc-toc" href="forms.html#text-fields">text · textarea · select</a></li>
+          <li><a class="doc-toc" href="forms.html#checkbox">checkbox</a></li>
+          <li><a class="doc-toc" href="forms.html#number">number · range</a></li>
+          <li><a class="doc-toc" href="forms.html#radio">radio groups</a></li>
+          <li><a class="doc-toc" href="forms.html#multi-select">select multiple</a></li>
+        </ul>
+
+        <a href="lists.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Lists</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="lists.html#list">.list(items, render, key)</a></li>
+          <li><a class="doc-toc" href="lists.html#template">The template</a></li>
+          <li><a class="doc-toc" href="lists.html#keys">Keys</a></li>
+          <li><a class="doc-toc" href="lists.html#reconciliation">Reconciliation</a></li>
+          <li><a class="doc-toc" href="lists.html#nested">Nested lists</a></li>
+          <li><a class="doc-toc" href="lists.html#animating">Animating changes</a></li>
+        </ul>
+
+        <p class="mt-8 px-2 text-[12px] leading-relaxed text-stone-400">
+          Every example on these pages runs against the same
+          <a href="../dist/ae.js" class="underline decoration-stone-300 underline-offset-2 hover:text-stone-600">dist/ae.js</a>
+          the demos load.
+        </p>
+      </nav>
+    </aside>
+  </div>
+
+  <!-- ===== footer ===== -->
+  <footer class="border-t border-stone-200/70">
+    <div class="mx-auto flex max-w-none flex-wrap items-center gap-x-6 gap-y-2 px-6 py-10 text-sm text-stone-500 xl:px-12">
+      <a href="index.html" class="flex items-center gap-2 font-display text-lg font-semibold text-stone-500 transition-colors hover:text-ink">
+        <img src="logo.svg" alt="" class="h-5 w-[1.75rem] opacity-80">
+        <span>ae</span>
+      </a>
+      <span>MIT license</span>
+      <span>3.9 KB min+gzip</span>
+      <a href="../API.md" class="transition hover:text-ink">API.md</a>
+      <a href="https://www.npmjs.com/package/@aeroapp/ae" class="transition hover:text-ink">npm</a>
+      <a href="https://github.com/nft/ae" class="transition hover:text-ink">GitHub</a>
+      <span class="ml-auto">This page runs on ae — view source.</span>
+    </div>
+  </footer>
+
+  <script type="importmap">{ "imports": { "@aeroapp/ae": "../dist/ae.js" } }</script>
+  <script type="module" src="docs.js"></script>
+  <script type="module">
+    import { ae } from '@aeroapp/ae';
+
+    // --- ae(name): bindings registered before the elements exist ---------------
+    const chips = ae.signal(0);
+    let chipSeq = 0;
+
+    ae('r-tally').text(() => `${chips.value} bound · click a chip to remove it`);
+
+    ae('r-chip')
+      .mount(() => { chips.value++; return () => { chips.value--; }; })
+      .press((el) => el.remove());
+
+    ae('r-add').press(() => {
+      const chip = document.createElement('button');
+      chip.dataset.ae = 'r-chip';
+      chip.className = 'rounded-full bg-amber-700/10 px-3 py-1 text-sm text-amber-900 transition hover:bg-amber-700/20';
+      chip.textContent = `chip ${++chipSeq}`;
+      ae('r-shelf').els[0].append(chip);
+    });
+
+    // --- .scope: identical inner names, private state per root -----------------
+    ae('r-panel').scope((panel) => {
+      const score = ae.signal(0);
+      ae('r-score', panel).text(score);
+      ae('r-bump', panel).press(() => score.value++);
+      ae('r-reset', panel).press(() => { score.value = 0; });
+    });
+
+    // --- ae.parts: the card reports its own parts map --------------------------
+    ae('r-badge').mount((root) => {
+      const p = ae.parts(root);
+      p['r-badge-keys'].textContent = Object.keys(p).join('  ·  ');
+      p['r-badge-root'].textContent = String('r-badge' in p);
+    });
+  </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 // Config for the committed site stylesheet. Regenerate after changing
-// classes in site/index.html:  bun run site:css
+// classes in site/*.html or site/*.js:  bun run site:css
 export default {
-  content: ['site/index.html'],
+  content: ['site/*.html', 'site/*.js'],
   theme: {
     extend: {
       colors: {

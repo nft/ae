@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Reference site: five pages documenting every member — signature,
+  parameters, gotchas, worked examples and live demos — covering handles and
+  lifecycle, signals and scheduling, rendering and events, forms, and lists.
+  Linked from the one-pager, the README and `API.md`, and covered by a
+  Playwright suite that gates the Pages deploy on anchors and links
+  resolving and demos running without console errors.
+
 ## [0.6.0] — 2026-07-20
 
 ### Added

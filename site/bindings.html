@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rendering &amp; events — ae reference</title>
+  <meta name="description" content="ae handle reference: .render, .text, .cls, .attr, .show, .press, .hover and .on — auto-tracked rendering and per-element event listeners, with live demos.">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Committed static build (theme + @apply utilities live in
+       site/tailwind.config.js and site/tailwind.in.css).
+       Regenerate after class changes: bun run site:css -->
+  <link rel="stylesheet" href="tailwind.css">
+</head>
+<body class="overflow-x-clip bg-cream font-sans text-ink antialiased">
+
+  <!-- ===== nav ===== -->
+  <nav class="sticky top-0 z-10 border-b border-stone-200/70 bg-cream/85 backdrop-blur">
+    <div class="mx-auto flex max-w-none items-center gap-6 px-6 py-3 xl:px-12">
+      <a href="index.html" class="flex items-center gap-2.5 font-display text-2xl font-semibold tracking-tight text-ink transition-colors hover:text-[#a41821]">
+        <img src="logo.svg" alt="" class="h-8 w-[2.8rem]">
+        <span>ae</span>
+      </a>
+      <span class="hidden rounded-full border border-amber-700/25 bg-amber-700/5 px-2.5 py-0.5 font-mono text-[11px] text-amber-800 sm:inline">reference</span>
+      <div class="ml-auto flex items-baseline gap-6 text-sm text-stone-500">
+        <a href="index.html#cases" class="hidden transition hover:text-ink sm:inline">Tour</a>
+        <a href="index.html#kanban" class="hidden transition hover:text-ink sm:inline">Kanban</a>
+        <a href="https://www.npmjs.com/package/@aeroapp/ae" class="hidden transition hover:text-ink sm:inline">npm</a>
+        <a href="https://github.com/nft/ae" class="transition hover:text-ink">GitHub</a>
+        <a href="../API.md" class="rounded-lg border border-stone-300 px-3 py-1.5 font-medium text-stone-700 transition hover:border-amber-700 hover:text-amber-800">API.md</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="mx-auto grid max-w-none gap-x-12 px-6 pb-16 pt-10 xl:px-12 lg:grid-cols-[15rem_minmax(0,1fr)]">
+
+    <!-- ===== page ===== -->
+    <main class="min-w-0 max-w-3xl space-y-12">
+      <header>
+        <span class="doc-eyebrow">reference · 3 of 5</span>
+        <h1 class="mt-3 font-display text-4xl font-medium tracking-tight">Rendering &amp; events</h1>
+        <p class="mt-4 text-lg leading-relaxed text-stone-600">Eight handle methods that push values into elements and pull events back out. Every one of them attaches per element through the mount pipeline, so elements added later bind themselves, removed ones tear down completely, and you never re-bind by hand.</p>
+        <p class="mt-4 leading-relaxed text-stone-600"><code class="doc-code">.render</code> is the primitive: your callback runs inside an auto-tracked effect. <code class="doc-code">.text</code>, <code class="doc-code">.cls</code>, <code class="doc-code">.attr</code> and <code class="doc-code">.show</code> are sugar over it — anything they do you can write by hand inside a render — and the three event methods are <a class="doc-link" href="reference.html#mount">.mount</a> plus an <code class="doc-code">addEventListener</code> paired with its removal. All eight append a binding and return the handle, so calls chain, and calling one twice adds a second binding rather than replacing the first.</p>
+        <div class="mt-6 flex flex-wrap gap-2">
+          <a href="#render" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.render</a>
+          <a href="#text" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.text</a>
+          <a href="#cls" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.cls</a>
+          <a href="#attr" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.attr</a>
+          <a href="#show" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.show</a>
+          <a href="#press" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.press</a>
+          <a href="#hover" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.hover</a>
+          <a href="#on" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.on</a>
+        </div>
+      </header>
+
+      <!-- ===== .render ===== -->
+      <section id="render" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.render(fn)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Runs <code class="doc-code">fn(el)</code> once per matching element inside its own auto-tracked effect. Every signal read during the run becomes a dependency of that element's effect, and a write re-runs it — batched, so one flush means at most one run. Elements connected later get their own effect when they mount; an element that leaves the DOM has its effect disposed, and a disposed effect never runs again, even if a write had already queued it.</p>
+
+        <div class="doc-sig mt-5">.render(fn: (el: HTMLElement) =&gt; void): this</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">fn</dt><dd class="text-stone-600">the render callback, called with the element; its return value is ignored — the binding's cleanup is the effect disposal, so put teardown in <a class="doc-link" href="reference.html#mount">.mount</a></dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the same <code class="doc-code">Handle</code>, for chaining</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">const user = ae.signal({ name: 'Ada', unread: 3 });
+
+ae('inbox').render((el) =&gt; {
+  el.textContent = `${user.value.name} — ${user.value.unread} unread`;
+  el.classList.toggle('has-unread', user.value.unread &gt; 0);
+});
+
+user.value = { ...user.value, unread: 0 };   // re-renders on the next microtask</code></pre>
+
+        <p class="mt-5 leading-relaxed text-stone-600">Reach for <a class="doc-link" href="reference.html#mount">.mount</a> when the work is one-time setup, and for <code class="doc-code">.render</code> when the element has to follow a value:</p>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">.mount(fn)</dt><dd class="text-stone-600">once per element, tracks nothing, may return a cleanup</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">.render(fn)</dt><dd class="text-stone-600">once per element and again per change, tracks every signal it reads</dd></div>
+        </dl>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — tracking is per run. Only the signals read on the <em>last</em> run are dependencies, so a branch that stops reading a signal stops depending on it. And a render that writes a signal it also reads trips the runaway guard after 100 flush cycles with a <code class="doc-code">console.error</code> instead of hanging the tab — see <a class="doc-link" href="reactivity.html#tracking">tracking rules</a>.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Faults are isolated</strong> — a throw on the first run is logged as <code class="doc-code">[ae] binding threw:</code>, a throw on a later run as <code class="doc-code">[ae] effect threw:</code>. Either way the other elements, and the other bindings on this element, keep working.</div>
+      </section>
+
+      <!-- ===== .text ===== -->
+      <section id="text" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.text(v)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Sets <code class="doc-code">textContent = String(v)</code> on every element in the handle. Like the other three helpers it takes the <a class="doc-link" href="reactivity.html#reactive-type">Reactive&lt;T&gt;</a> union, so one method covers a constant, a signal and a derived expression.</p>
+
+        <div class="doc-sig mt-5">.text(v: Reactive&lt;string | number&gt;): this</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">v</dt><dd class="text-stone-600">a plain value (applied once, at mount), a <code class="doc-code">Signal</code>/<code class="doc-code">Computed</code> (reactive), or <code class="doc-code">(el) =&gt; value</code> (run in an auto-tracked effect, so signals read inside make it reactive)</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the same <code class="doc-code">Handle</code>, for chaining</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">const count = ae.signal(0);
+const label = ae.computed(() =&gt; `${count.value} item${count.value === 1 ? '' : 's'}`);
+
+ae('brand').text('ae');          // plain value — set once, at mount
+ae('count').text(count);         // signal — reactive
+ae('summary').text(label);       // computed — reactive
+ae('badge').text(() =&gt; count.value &gt; 9 ? '9+' : count.value);   // function — tracked</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — writing <code class="doc-code">textContent</code> replaces every child of the target, so <code class="doc-code">.text</code> is for leaf elements. It never parses markup either: a value containing <code class="doc-code">&lt;b&gt;</code> shows up as those three characters, which is what makes it injection-safe.</div>
+      </section>
+
+      <!-- ===== .cls ===== -->
+      <section id="cls" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.cls(name, on?)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Two methods in one signature. With <code class="doc-code">on</code> supplied it is <code class="doc-code">classList.toggle(name, !!value)</code> over the reactive union — the class follows the value, and any truthy value counts. With <code class="doc-code">on</code> omitted it is a one-shot <code class="doc-code">classList.toggle(name)</code> per element at mount time: no effect, no tracking, no reactivity.</p>
+
+        <div class="doc-sig mt-5">.cls(name: string, on?: Reactive&lt;boolean&gt;): this</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">name</dt><dd class="text-stone-600">the class to toggle</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">on</dt><dd class="text-stone-600">optional; value, signal, or <code class="doc-code">(el) =&gt; boolean</code>. Omit it for the one-shot flip</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the same <code class="doc-code">Handle</code>, for chaining</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">const filter = ae.signal('all');
+const busy = ae.signal(false);
+
+ae('tab').cls('active', (el) =&gt; el.dataset.filter === filter.value);   // per element
+ae('form').cls('is-busy', busy);
+ae('legacy-row').cls('js-enhanced');   // one-shot: flipped once, at mount</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — the one-shot form <em>toggles</em>, it does not add. On an element that already carries the class it removes it, and because bindings re-run on every mount, an element that is removed and re-inserted flips again. When you mean "add", write <code class="doc-code">.cls('x', true)</code>.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Note</strong> — the function form is per element: it receives the element, so one handle over many elements can decide each one's class from its own markup, as the <code class="doc-code">tab</code> example does.</div>
+      </section>
+
+      <!-- ===== .attr ===== -->
+      <section id="attr" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.attr(name, v)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Sets one attribute from a reactive value, with the <em>absence</em> of the attribute as a first-class state — which is what HTML's boolean attributes actually need.</p>
+
+        <div class="doc-sig mt-5">.attr(name: string, v: Reactive&lt;string | number | boolean | null | undefined&gt;): this</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">name</dt><dd class="text-stone-600">the attribute to write</dd></div>
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">null undefined false</dt><dd class="text-stone-600"><code class="doc-code">removeAttribute(name)</code></dd></div>
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">true</dt><dd class="text-stone-600"><code class="doc-code">setAttribute(name, '')</code> — the empty string, as in <code class="doc-code">disabled=""</code></dd></div>
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">anything else</dt><dd class="text-stone-600"><code class="doc-code">setAttribute(name, String(value))</code></dd></div>
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the same <code class="doc-code">Handle</code>, for chaining</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">const busy = ae.signal(false);
+const user = ae.signal({ avatar: null });
+
+ae('save')
+  .attr('disabled', busy)                          // true → disabled="" , false → removed
+  .attr('aria-busy', () =&gt; String(busy.value));    // ARIA wants the string "true"/"false"
+
+ae('avatar').attr('src', () =&gt; user.value.avatar ?? null);   // null removes the attribute</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — ARIA attributes are not boolean attributes. <code class="doc-code">.attr('aria-expanded', true)</code> writes <code class="doc-code">aria-expanded=""</code>, not the string <code class="doc-code">"true"</code> that assistive technology reads. Map it yourself, as above.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Gotcha</strong> — attributes are not properties. <code class="doc-code">.attr('value', …)</code> only seeds a field's initial value and stops mattering once the user types; for form state use <a class="doc-link" href="forms.html#input">.input</a>, which writes the property.</div>
+      </section>
+
+      <!-- ===== .show ===== -->
+      <section id="show" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.show(on)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Toggles the <code class="doc-code">hidden</code> property — <code class="doc-code">el.hidden = !value</code>. The element stays in the DOM, so it stays mounted and its other bindings keep running; only its rendering is suppressed. To take an element out of the document entirely, drive a <a class="doc-link" href="lists.html#list">.list</a> instead.</p>
+
+        <div class="doc-sig mt-5">.show(on: Reactive&lt;boolean&gt;): this</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">on</dt><dd class="text-stone-600">value, signal, or <code class="doc-code">(el) =&gt; boolean</code>; truthy shows, falsy hides</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the same <code class="doc-code">Handle</code>, for chaining</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;ul data-ae="todos"&gt;
+  &lt;li data-ae="empty"&gt;Nothing left.&lt;/li&gt;
+  &lt;template&gt;&lt;li data-ae="row"&gt;&lt;/li&gt;&lt;/template&gt;
+&lt;/ul&gt;
+
+ae('empty').show(() =&gt; todos.value.length === 0);
+ae('spinner').show(busy);</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — <code class="doc-code">hidden</code> hides through the user-agent rule <code class="doc-code">[hidden] { display: none }</code>, and any <code class="doc-code">display</code> your own CSS sets on that element wins over it. An element carrying a <code class="doc-code">flex</code> or <code class="doc-code">grid</code> utility class stays visible while hidden; put the display utility on a wrapper, or add <code class="doc-code">[hidden] { display: none !important }</code> to your stylesheet.</div>
+
+        <div class="doc-card mt-6">
+          <p class="doc-eyebrow">live</p>
+          <p class="mt-2 text-sm leading-relaxed text-stone-600">One signal, four helpers: <code class="doc-code">.text</code> writes the count, <code class="doc-code">.cls</code> tints it once it moves, <code class="doc-code">.attr</code> adds and removes <code class="doc-code">disabled</code>, and <code class="doc-code">.show</code> reveals Reset and the badge.</p>
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button data-ae="b-h-up" class="demo-btn disabled:opacity-40">Fill +1</button>
+            <button data-ae="b-h-reset" class="demo-btn">Reset</button>
+            <span data-ae="b-h-level" class="font-display text-2xl"></span>
+            <span data-ae="b-h-full" class="rounded-full bg-amber-700/10 px-2.5 py-1 font-mono text-[11px] text-amber-900">full — the button now has disabled=""</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== .press ===== -->
+      <section id="press" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.press(fn)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Activation, not <code class="doc-code">click</code>. Every element gets a <code class="doc-code">click</code> listener; Enter and Space are synthesized <strong class="font-semibold text-ink">only</strong> for elements the browser does not activate on its own. <code class="doc-code">button</code>, <code class="doc-code">a[href]</code>, <code class="doc-code">input</code>, <code class="doc-code">select</code>, <code class="doc-code">textarea</code>, <code class="doc-code">summary</code> and elements whose <code class="doc-code">contenteditable</code> is <code class="doc-code">""</code>, <code class="doc-code">true</code> or <code class="doc-code">plaintext-only</code> are excluded, for one of two reasons: on <code class="doc-code">button</code>, <code class="doc-code">summary</code>, <code class="doc-code">a[href]</code> and the button-like inputs the browser already turns those keys into a click, so a second listener would double-fire; in a text field or an editable region the keys mean text entry, and a <code class="doc-code">keydown</code> that calls <code class="doc-code">preventDefault</code> on Space would hijack typing.</p>
+
+        <div class="doc-sig mt-5">.press(fn: (el: HTMLElement, ev: PressEvent) =&gt; void): this
+type PressEvent = MouseEvent | KeyboardEvent</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">fn</dt><dd class="text-stone-600">handler, called with the element and the originating event — a <code class="doc-code">MouseEvent</code> for a click, a <code class="doc-code">KeyboardEvent</code> for Enter and Space</dd></div>
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the same <code class="doc-code">Handle</code>, for chaining</dd></div>
+        </dl>
+
+        <p class="mt-5 leading-relaxed text-stone-600">The synthesized half copies what a native button does:</p>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">click</dt><dd class="text-stone-600">fires for every element, native or not</dd></div>
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">Enter</dt><dd class="text-stone-600">fires on <code class="doc-code">keydown</code> and calls <code class="doc-code">preventDefault</code>; a held key repeats, so it fires again per repeat</dd></div>
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">Space</dt><dd class="text-stone-600">fires once on <code class="doc-code">keyup</code>; its <code class="doc-code">keydown</code> only calls <code class="doc-code">preventDefault</code>, to stop the page scrolling</dd></div>
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">blur</dt><dd class="text-stone-600">disarms a pending Space, so moving focus mid-press cancels the activation</dd></div>
+          <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[12.5px] text-amber-900">nested keys</dt><dd class="text-stone-600">keys whose target is a nested native control or editable text (inherited <code class="doc-code">contenteditable</code> included) are ignored and left un-prevented, so typing inside a pressable card is never hijacked</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;div data-ae="tile" role="button" tabindex="0"&gt;Archive&lt;/div&gt;
+&lt;button data-ae="tile"&gt;Archive&lt;/button&gt;
+
+const pinned = ae.signal(false);
+const via = ae.signal('');
+
+ae('tile').press((el, ev) =&gt; {
+  pinned.value = !pinned.value;
+  via.value = ev.type;    // 'click', or 'keydown' (Enter) / 'keyup' (Space)
+});</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — ae adds behavior, not accessibility metadata. A <code class="doc-code">div</code> you make pressable still needs <code class="doc-code">tabindex="0"</code> so it can be focused and a <code class="doc-code">role</code> so it is announced as a control — both written by you. When a real <code class="doc-code">&lt;button&gt;</code> fits, use one and get all of it for free.</div>
+
+        <div class="doc-card mt-6">
+          <p class="doc-eyebrow">live</p>
+          <p class="mt-2 text-sm leading-relaxed text-stone-600">Both controls carry <code class="doc-code">data-ae="b-p-tile"</code>, so one <code class="doc-code">.press</code> call drives both. Click them — then press <kbd class="rounded border border-stone-300 px-1 text-[11px]">Tab</kbd> until the div has focus and hit <kbd class="rounded border border-stone-300 px-1 text-[11px]">Space</kbd> or <kbd class="rounded border border-stone-300 px-1 text-[11px]">Enter</kbd>.</p>
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <div data-ae="b-p-tile" role="button" tabindex="0" class="cursor-pointer rounded-lg border border-stone-300 bg-white px-3.5 py-1.5 text-sm font-medium text-stone-700 transition hover:border-amber-600 hover:text-amber-800 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/25">div[role=button]</div>
+            <button data-ae="b-p-tile" class="demo-btn">native button</button>
+            <span data-ae="b-p-count" class="font-display text-2xl"></span>
+            <span class="font-mono text-[11px] text-stone-400">last event: <b data-ae="b-p-how" class="text-amber-800"></b></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== .hover ===== -->
+      <section id="hover" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.hover(enter, leave)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Binds <code class="doc-code">pointerenter</code> and <code class="doc-code">pointerleave</code> on the element itself. Neither event bubbles, which makes nesting safe by construction: moving the pointer from a card onto a button inside it does not fire the card's leave, and the button's own <code class="doc-code">.hover</code> never reaches the card. Both callbacks are optional — pass <code class="doc-code">undefined</code> for the one you do not need.</p>
+
+        <div class="doc-sig mt-5">.hover(
+  enter?: (el: HTMLElement, ev: PointerEvent) =&gt; void,
+  leave?: (el: HTMLElement, ev: PointerEvent) =&gt; void,
+): this</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">enter</dt><dd class="text-stone-600">optional; runs on <code class="doc-code">pointerenter</code></dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">leave</dt><dd class="text-stone-600">optional; runs on <code class="doc-code">pointerleave</code></dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the same <code class="doc-code">Handle</code>, for chaining</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">const preview = ae.signal(null);
+
+ae('card').hover(
+  (el) =&gt; { preview.value = ae.itemOf(el); },
+  () =&gt; { preview.value = null; },
+);
+
+ae('row').hover(undefined, (el) =&gt; el.classList.remove('menu-open'));   // leave only</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — pointer events cover mouse, pen <em>and</em> touch: a tap fires enter on contact and leave when the finger lifts. Treat hover as an enhancement and keep the same state reachable through <a class="doc-link" href="#press">.press</a> or focus, or half your users will never see it.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Note</strong> — plain CSS <code class="doc-code">:hover</code> is still cheaper. Use <code class="doc-code">.hover</code> when the pointer has to change a signal, not when it only has to change a colour.</div>
+      </section>
+
+      <!-- ===== .on ===== -->
+      <section id="on" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.on(type, fn, opts?)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">The escape hatch: any DOM event type, attached per element through the mount pipeline and removed on unmount. Because nothing is delegated, non-bubbling events such as <code class="doc-code">focus</code>, <code class="doc-code">blur</code> and <code class="doc-code">pointerenter</code> work, <code class="doc-code">stopPropagation</code> behaves the way the platform says it does, and nested <code class="doc-code">data-ae</code> elements never shadow each other's listeners.</p>
+
+        <div class="doc-sig mt-5">.on&lt;K extends keyof HTMLElementEventMap&gt;(
+  type: K,
+  fn: (el: HTMLElement, ev: HTMLElementEventMap[K]) =&gt; void,
+  opts?: AddEventListenerOptions,
+): this
+.on(type: string, fn: (el: HTMLElement, ev: Event) =&gt; void, opts?: AddEventListenerOptions): this</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">type</dt><dd class="text-stone-600">any event name; a name in <code class="doc-code">HTMLElementEventMap</code> picks the typed overload</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">fn</dt><dd class="text-stone-600">handler, called with the element and the event</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">opts</dt><dd class="text-stone-600">a standard <code class="doc-code">AddEventListenerOptions</code> — <code class="doc-code">once</code>, <code class="doc-code">passive</code>, <code class="doc-code">capture</code> — passed straight through to <code class="doc-code">addEventListener</code> and to its removal</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the same <code class="doc-code">Handle</code>, for chaining</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">const draft = ae.signal('');
+const hint = ae.signal(false);
+
+ae('draft')
+  .input(draft)
+  .on('keydown', (el, ev) =&gt; { if (ev.key === 'Enter') add(draft.value); })
+  .on('focus', () =&gt; { hint.value = true; })     // focus does not bubble —
+  .on('blur', () =&gt; { hint.value = false; });    // a per-element listener gets it
+
+ae('feed').on('scroll', onScroll, { passive: true });
+ae('tour').on('click', () =&gt; { seen.value = true; }, { once: true });
+ae('picker').on('item:picked', (el, ev) =&gt; { chosen.value = ev.detail.id; });</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — <code class="doc-code">{ once: true }</code> is once per element per mount. The listener is attached fresh every time the element enters the DOM, so an element that is removed and re-inserted — a <a class="doc-link" href="lists.html#list">.list</a> node whose key vanished and came back, for instance — fires again.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Note</strong> — the typed overload only covers names in <code class="doc-code">HTMLElementEventMap</code>. A custom event name falls through to the string overload, where <code class="doc-code">ev</code> is a plain <code class="doc-code">Event</code>; narrow it to <code class="doc-code">CustomEvent</code> yourself to reach <code class="doc-code">detail</code>.</div>
+
+        <div class="doc-card mt-6">
+          <p class="doc-eyebrow">live</p>
+          <p class="mt-2 text-sm leading-relaxed text-stone-600">Focus the field and tab away: <code class="doc-code">focus</code> and <code class="doc-code">blur</code> never bubble, yet the per-element listeners see both. The button next to it is bound with <code class="doc-code">{ once: true }</code>.</p>
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <input data-ae="b-o-field" placeholder="Type, then tab away…" class="demo-field w-full sm:w-56">
+            <span class="font-mono text-[11px] text-stone-500">focused: <b data-ae="b-o-state" class="text-amber-800"></b> · <b data-ae="b-o-chars" class="text-amber-800"></b></span>
+            <button data-ae="b-o-once" class="demo-btn disabled:opacity-40">Fire once</button>
+            <span data-ae="b-o-note" class="font-mono text-[11px] text-stone-400"></span>
+          </div>
+        </div>
+      </section>
+
+      <nav class="flex flex-wrap items-center justify-between gap-4 border-t border-stone-200/70 pt-8 font-medium">
+        <a class="doc-link" href="reactivity.html">&larr; Signals &amp; scheduling</a>
+        <a class="doc-link" href="forms.html">Forms &rarr;</a>
+      </nav>
+    </main>
+
+    <!-- ===== sidebar (source order after main so mobile reads content first) ===== -->
+    <aside class="mt-16 border-t border-stone-200/70 pt-8 text-sm lg:sticky lg:top-[57px] lg:order-first lg:mt-0 lg:max-h-[calc(100vh-57px)] lg:self-start lg:overflow-y-auto lg:border-0 lg:pb-10 lg:pt-8">
+      <nav aria-label="API reference">
+        <p class="px-2 font-mono text-[11px] uppercase tracking-widest text-stone-400">Every member</p>
+
+        <a href="reference.html" class="mt-4 block px-2 font-medium text-stone-600 hover:text-ink">Handles &amp; lifecycle</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="reference.html#handle">ae(name)</a></li>
+          <li><a class="doc-toc" href="reference.html#handle-scoped">ae(name, root)</a></li>
+          <li><a class="doc-toc" href="reference.html#mount">.mount(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#scope">.scope(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#els">.els</a></li>
+          <li><a class="doc-toc" href="reference.html#each">.each(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#parts">ae.parts(root)</a></li>
+          <li><a class="doc-toc" href="reference.html#item-of">ae.itemOf(el)</a></li>
+          <li><a class="doc-toc" href="reference.html#observe">ae.observe(root)</a></li>
+          <li><a class="doc-toc" href="reference.html#semantics">Semantics</a></li>
+        </ul>
+
+        <a href="reactivity.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Signals &amp; scheduling</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="reactivity.html#signal">ae.signal(v)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#signal-value">Signal.value</a></li>
+          <li><a class="doc-toc" href="reactivity.html#computed">ae.computed(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#effect">ae.effect(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#is-signal">ae.isSignal(v)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#settled">ae.settled()</a></li>
+          <li><a class="doc-toc" href="reactivity.html#transition">ae.transition(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#reactive-type">Reactive&lt;T&gt;</a></li>
+          <li><a class="doc-toc" href="reactivity.html#tracking">Tracking rules</a></li>
+        </ul>
+
+        <a href="bindings.html" class="mt-6 block px-2 font-medium text-amber-800" aria-current="page">Rendering &amp; events</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="bindings.html#render">.render(fn)</a></li>
+          <li><a class="doc-toc" href="bindings.html#text">.text(v)</a></li>
+          <li><a class="doc-toc" href="bindings.html#cls">.cls(name, on?)</a></li>
+          <li><a class="doc-toc" href="bindings.html#attr">.attr(name, v)</a></li>
+          <li><a class="doc-toc" href="bindings.html#show">.show(on)</a></li>
+          <li><a class="doc-toc" href="bindings.html#press">.press(fn)</a></li>
+          <li><a class="doc-toc" href="bindings.html#hover">.hover(enter, leave)</a></li>
+          <li><a class="doc-toc" href="bindings.html#on">.on(type, fn, opts)</a></li>
+        </ul>
+
+        <a href="forms.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Forms</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="forms.html#input">.input(signal)</a></li>
+          <li><a class="doc-toc" href="forms.html#text-fields">text · textarea · select</a></li>
+          <li><a class="doc-toc" href="forms.html#checkbox">checkbox</a></li>
+          <li><a class="doc-toc" href="forms.html#number">number · range</a></li>
+          <li><a class="doc-toc" href="forms.html#radio">radio groups</a></li>
+          <li><a class="doc-toc" href="forms.html#multi-select">select multiple</a></li>
+        </ul>
+
+        <a href="lists.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Lists</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="lists.html#list">.list(items, render, key)</a></li>
+          <li><a class="doc-toc" href="lists.html#template">The template</a></li>
+          <li><a class="doc-toc" href="lists.html#keys">Keys</a></li>
+          <li><a class="doc-toc" href="lists.html#reconciliation">Reconciliation</a></li>
+          <li><a class="doc-toc" href="lists.html#nested">Nested lists</a></li>
+          <li><a class="doc-toc" href="lists.html#animating">Animating changes</a></li>
+        </ul>
+
+        <p class="mt-8 px-2 text-[12px] leading-relaxed text-stone-400">
+          Every example on these pages runs against the same
+          <a href="../dist/ae.js" class="underline decoration-stone-300 underline-offset-2 hover:text-stone-600">dist/ae.js</a>
+          the demos load.
+        </p>
+      </nav>
+    </aside>
+  </div>
+
+  <!-- ===== footer ===== -->
+  <footer class="border-t border-stone-200/70">
+    <div class="mx-auto flex max-w-none flex-wrap items-center gap-x-6 gap-y-2 px-6 py-10 text-sm text-stone-500 xl:px-12">
+      <a href="index.html" class="flex items-center gap-2 font-display text-lg font-semibold text-stone-500 transition-colors hover:text-ink">
+        <img src="logo.svg" alt="" class="h-5 w-[1.75rem] opacity-80">
+        <span>ae</span>
+      </a>
+      <span>MIT license</span>
+      <span>3.9 KB min+gzip</span>
+      <a href="../API.md" class="transition hover:text-ink">API.md</a>
+      <a href="https://www.npmjs.com/package/@aeroapp/ae" class="transition hover:text-ink">npm</a>
+      <a href="https://github.com/nft/ae" class="transition hover:text-ink">GitHub</a>
+      <span class="ml-auto">This page runs on ae — view source.</span>
+    </div>
+  </footer>
+
+  <script type="importmap">{ "imports": { "@aeroapp/ae": "../dist/ae.js" } }</script>
+  <script type="module" src="docs.js"></script>
+  <script type="module">
+    import { ae } from '@aeroapp/ae';
+
+    // --- .text · .cls · .attr · .show: one signal drives four helpers --------
+    const FULL = 3;
+    const level = ae.signal(0);
+
+    ae('b-h-level')
+      .text(() => `${level.value} / ${FULL}`)
+      .cls('text-amber-800', () => level.value > 0);
+    ae('b-h-up')
+      .attr('disabled', () => level.value === FULL)
+      .press(() => { level.value++; });
+    ae('b-h-reset')
+      .show(() => level.value > 0)
+      .press(() => { level.value = 0; });
+    ae('b-h-full').show(() => level.value === FULL);
+
+    // --- .press: click for both, Enter/Space synthesized for the div only ----
+    const presses = ae.signal(0);
+    const how = ae.signal('nothing yet');
+
+    ae('b-p-tile').press((el, ev) => {
+      presses.value++;
+      how.value = ev.type === 'click'
+        ? 'click'
+        : `${ev.key === ' ' ? 'Space' : ev.key} ${ev.type}`;
+    });
+    ae('b-p-count').text(presses);
+    ae('b-p-how').text(how);
+
+    // --- .on: focus/blur do not bubble; per-element listeners get them anyway -
+    const focused = ae.signal(false);
+    const chars = ae.signal(0);
+
+    ae('b-o-field')
+      .on('focus', () => { focused.value = true; })
+      .on('blur', () => { focused.value = false; })
+      .on('input', (el) => { chars.value = el.value.length; });
+    ae('b-o-state').text(() => (focused.value ? 'yes' : 'no'));
+    ae('b-o-chars').text(() => `${chars.value} chars`);
+
+    const onceFired = ae.signal(false);
+    ae('b-o-once')
+      .on('click', () => { onceFired.value = true; }, { once: true })
+      .attr('disabled', onceFired);
+    ae('b-o-note').text(() => (onceFired.value ? 'listener removed itself' : ''));
+  </script>
+</body>
+</html>

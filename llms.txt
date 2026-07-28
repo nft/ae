@@ -133,4 +133,6 @@ cycles instead of hanging).
 - `ae.parts` root itself is not a part; first match wins on duplicates.
 - Duplicate `.list` keys log an error and fall back to fresh nodes.
 
-Full prose spec: API.md in the repo (github.com/nft/ae).
+Full prose spec: API.md in the repo (github.com/nft/ae). Member-by-member
+reference with examples: https://nft.github.io/ae/reference.html (and
+reactivity.html, bindings.html, forms.html, lists.html).

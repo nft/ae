@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forms — ae reference</title>
+  <meta name="description" content="ae's .input(signal): two-way binding for text fields, checkboxes, number and range inputs, radio groups and multi-selects — each wired to the signal type the field actually speaks.">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Committed static build (theme + @apply utilities live in
+       site/tailwind.config.js and site/tailwind.in.css).
+       Regenerate after class changes: bun run site:css -->
+  <link rel="stylesheet" href="tailwind.css">
+</head>
+<body class="overflow-x-clip bg-cream font-sans text-ink antialiased">
+
+  <!-- ===== nav ===== -->
+  <nav class="sticky top-0 z-10 border-b border-stone-200/70 bg-cream/85 backdrop-blur">
+    <div class="mx-auto flex max-w-none items-center gap-6 px-6 py-3 xl:px-12">
+      <a href="index.html" class="flex items-center gap-2.5 font-display text-2xl font-semibold tracking-tight text-ink transition-colors hover:text-[#a41821]">
+        <img src="logo.svg" alt="" class="h-8 w-[2.8rem]">
+        <span>ae</span>
+      </a>
+      <span class="hidden rounded-full border border-amber-700/25 bg-amber-700/5 px-2.5 py-0.5 font-mono text-[11px] text-amber-800 sm:inline">reference</span>
+      <div class="ml-auto flex items-baseline gap-6 text-sm text-stone-500">
+        <a href="index.html#cases" class="hidden transition hover:text-ink sm:inline">Tour</a>
+        <a href="index.html#kanban" class="hidden transition hover:text-ink sm:inline">Kanban</a>
+        <a href="https://www.npmjs.com/package/@aeroapp/ae" class="hidden transition hover:text-ink sm:inline">npm</a>
+        <a href="https://github.com/nft/ae" class="transition hover:text-ink">GitHub</a>
+        <a href="../API.md" class="rounded-lg border border-stone-300 px-3 py-1.5 font-medium text-stone-700 transition hover:border-amber-700 hover:text-amber-800">API.md</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="mx-auto grid max-w-none gap-x-12 px-6 pb-16 pt-10 xl:px-12 lg:grid-cols-[15rem_minmax(0,1fr)]">
+
+    <!-- ===== page ===== -->
+    <main class="min-w-0 max-w-3xl space-y-12">
+      <header>
+        <span class="doc-eyebrow">reference · 4 of 5</span>
+        <h1 class="mt-3 font-display text-4xl font-medium tracking-tight">Forms</h1>
+        <p class="mt-4 text-lg leading-relaxed text-stone-600">One method covers every field on the page.
+          <code class="doc-code">.input(signal)</code> reads the element's own type and wires the property that field actually speaks —
+          <code class="doc-code">value</code>, <code class="doc-code">checked</code>, <code class="doc-code">valueAsNumber</code>, the group
+          value, the selected set — so your signal holds a real string, boolean, number or array instead of whatever the DOM would have handed
+          you. Five wirings, no configuration, and no <code class="doc-code">parseInt</code> anywhere.</p>
+        <div class="mt-6 flex flex-wrap gap-2">
+          <a href="#input" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.input(signal)</a>
+          <a href="#text-fields" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">text · textarea · select</a>
+          <a href="#checkbox" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">checkbox</a>
+          <a href="#number" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">number · range</a>
+          <a href="#radio" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">radio groups</a>
+          <a href="#multi-select" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">select multiple</a>
+        </div>
+      </header>
+
+      <!-- ===================================================================== -->
+      <section id="input" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.input(signal)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Two-way binding between one signal and every element carrying the name. It is sugar over
+          <a class="doc-link" href="bindings.html#render">.render</a> plus <a class="doc-link" href="bindings.html#on">.on('input')</a>: one
+          tracked effect writes the field when the signal changes, and two listeners — <code class="doc-code">input</code> <em>and</em>
+          <code class="doc-code">change</code> — write the signal when the user edits. The field's own type picks the wiring; nothing else
+          configures it.</p>
+
+        <div class="doc-sig mt-5">.input&lt;T extends string | number | boolean | string[]&gt;(sig: Signal&lt;T&gt;): this</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">sig</dt><dd class="text-stone-600">a writable <a class="doc-link" href="reactivity.html#signal">Signal</a> — the value lives here, the field is a view of it. A <a class="doc-link" href="reactivity.html#computed">Computed</a> has no setter, so it is not accepted</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the same <code class="doc-code">Handle</code>, so <code class="doc-code">.input(draft).on('keydown', …)</code> chains</dd></div>
+        </dl>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-56 shrink-0"><a class="doc-link font-mono text-[12.5px]" href="forms.html#text-fields">input · textarea · select</a></dt><dd class="text-stone-600"><code class="doc-code">Signal&lt;string&gt;</code> via <code class="doc-code">value</code></dd></div>
+          <div class="flex gap-4"><dt class="w-56 shrink-0"><a class="doc-link font-mono text-[12.5px]" href="forms.html#checkbox">input[type=checkbox]</a></dt><dd class="text-stone-600"><code class="doc-code">Signal&lt;boolean&gt;</code> via <code class="doc-code">checked</code></dd></div>
+          <div class="flex gap-4"><dt class="w-56 shrink-0"><a class="doc-link font-mono text-[12.5px]" href="forms.html#number">input[type=number|range]</a></dt><dd class="text-stone-600"><code class="doc-code">Signal&lt;number&gt;</code> via <code class="doc-code">valueAsNumber</code></dd></div>
+          <div class="flex gap-4"><dt class="w-56 shrink-0"><a class="doc-link font-mono text-[12.5px]" href="forms.html#radio">input[type=radio]</a></dt><dd class="text-stone-600"><code class="doc-code">Signal&lt;string&gt;</code> holding the group value</dd></div>
+          <div class="flex gap-4"><dt class="w-56 shrink-0"><a class="doc-link font-mono text-[12.5px]" href="forms.html#multi-select">select[multiple]</a></dt><dd class="text-stone-600"><code class="doc-code">Signal&lt;string[]&gt;</code> via <code class="doc-code">selectedOptions</code></dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;input data-ae="draft" placeholder="New item…"&gt;
+&lt;button data-ae="add"&gt;Add&lt;/button&gt;
+
+const draft = ae.signal('');
+const items = ae.signal([]);
+
+ae('draft').input(draft)                       // both directions
+  .on('keydown', (el, ev) =&gt; { if (ev.key === 'Enter') add(); });
+
+ae('add').press(() =&gt; add());
+
+function add() {
+  const text = draft.value.trim();             // read the signal, not el.value
+  if (!text) return;
+  items.value = [...items.value, text];
+  draft.value = '';                            // clears the field
+}</code></pre>
+
+        <p class="mt-5 leading-relaxed text-stone-600">The binding attaches through the normal
+          <a class="doc-link" href="reference.html#mount">mount</a> pipeline, so a field stamped later by
+          <a class="doc-link" href="lists.html#list">.list</a> binds itself, and a field removed from the DOM stops in both directions at once —
+          it no longer receives signal writes and no longer writes to the signal. Every matching element gets its own binding, so several fields
+          sharing one name and one signal mirror each other.</p>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Guarantee</strong> — every signal → field write is
+          equality-guarded: <code class="doc-code">Object.is</code> for scalars, element-wise for the array modes. A field you are typing in is
+          never reassigned the value it already holds, so the flush after your keystroke cannot move the caret to the end.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Gotcha</strong> — the signal wins at bind time. The first write
+          runs the moment the binding attaches, so a <code class="doc-code">value="…"</code> in your markup is overwritten by
+          <code class="doc-code">sig.value</code>. Seed the signal from your data; treat the attribute as a placeholder for the pre-JS paint.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Gotcha</strong> — a target that is not an
+          <code class="doc-code">&lt;input&gt;</code>, <code class="doc-code">&lt;textarea&gt;</code> or <code class="doc-code">&lt;select&gt;</code>
+          logs <code class="doc-code">[ae] .input target is not a form field:</code> with the element and no-ops. Only that one binding drops out —
+          the handle's other bindings still attach.</div>
+
+        <div class="doc-card mt-6">
+          <p class="doc-eyebrow">live · every wiring at once</p>
+          <p class="mt-2 text-sm leading-relaxed text-stone-600">Edit anything. The readout is the signals themselves, printed with their real
+            types — watch <code class="doc-code">3</code> stay a number, the checkbox stay a boolean, and the regions stay an array.</p>
+          <div class="mt-4 grid gap-4 sm:grid-cols-2">
+            <label class="text-xs font-medium text-stone-500">Name — text
+              <input data-ae="f-name" class="demo-field mt-1.5 w-full" placeholder="Ada">
+            </label>
+            <label class="text-xs font-medium text-stone-500">Role — select
+              <select data-ae="f-role" class="demo-field mt-1.5 w-full">
+                <option value="admin">admin</option>
+                <option value="editor">editor</option>
+                <option value="viewer">viewer</option>
+              </select>
+            </label>
+            <label class="text-xs font-medium text-stone-500 sm:col-span-2">Bio — textarea
+              <textarea data-ae="f-bio" rows="2" class="demo-field mt-1.5 w-full"></textarea>
+            </label>
+            <label class="text-xs font-medium text-stone-500">Seats — number
+              <input data-ae="f-seats" type="number" min="0" max="20" class="demo-field mt-1.5 w-full">
+            </label>
+            <label class="text-xs font-medium text-stone-500">Seats — range, same signal
+              <input data-ae="f-seats" type="range" min="0" max="20" class="mt-3 w-full accent-amber-700">
+            </label>
+            <label class="flex items-center gap-2 self-end text-sm text-stone-600">
+              <input data-ae="f-yearly" type="checkbox" class="h-4 w-4 accent-amber-700"> Bill yearly
+            </label>
+            <fieldset class="sm:col-span-2">
+              <legend class="text-xs font-medium text-stone-500">Tier — radio, no <code class="font-mono text-[11px]">name=</code> anywhere</legend>
+              <div class="mt-2 flex flex-wrap gap-4 text-sm text-stone-600">
+                <label class="flex items-center gap-2"><input data-ae="f-tier" type="radio" value="free" class="accent-amber-700"> free</label>
+                <label class="flex items-center gap-2"><input data-ae="f-tier" type="radio" value="pro" class="accent-amber-700"> pro</label>
+                <label class="flex items-center gap-2"><input data-ae="f-tier" type="radio" value="scale" class="accent-amber-700"> scale</label>
+              </div>
+            </fieldset>
+            <label class="text-xs font-medium text-stone-500 sm:col-span-2">Regions — select multiple
+              <select data-ae="f-regions" multiple size="3" class="demo-field mt-1.5 w-full">
+                <option value="eu">eu</option>
+                <option value="us">us</option>
+                <option value="apac">apac</option>
+              </select>
+            </label>
+          </div>
+          <pre data-ae="f-json" class="doc-pre mt-5 whitespace-pre-wrap"></pre>
+        </div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <section id="text-fields" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">input · textarea · select</code>
+          <span class="ml-1 font-mono text-[13px] text-stone-400">Signal&lt;string&gt;</span>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">The default wiring, and the one every field falls back to. Any
+          <code class="doc-code">&lt;input&gt;</code> that is not a checkbox, radio, number or range — <code class="doc-code">text</code>,
+          <code class="doc-code">search</code>, <code class="doc-code">email</code>, <code class="doc-code">password</code>,
+          <code class="doc-code">url</code>, <code class="doc-code">date</code>, <code class="doc-code">color</code>, and anything the browser
+          does not recognise, which it reports as <code class="doc-code">text</code> — plus every <code class="doc-code">&lt;textarea&gt;</code>
+          and every single <code class="doc-code">&lt;select&gt;</code> binds <code class="doc-code">el.value</code> to a
+          <code class="doc-code">Signal&lt;string&gt;</code>.</p>
+
+        <div class="doc-sig mt-5">&lt;input&gt; · &lt;textarea&gt; · &lt;select&gt;   ↔   Signal&lt;string&gt;   via  el.value</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">reads</dt><dd class="text-stone-600"><code class="doc-code">el.value</code> on <code class="doc-code">input</code> and <code class="doc-code">change</code></dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">writes</dt><dd class="text-stone-600"><code class="doc-code">el.value = String(v)</code>, skipped when it already matches</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;input data-ae="query" type="search" placeholder="Search…"&gt;
+&lt;textarea data-ae="note" rows="3"&gt;&lt;/textarea&gt;
+&lt;select data-ae="role"&gt;
+  &lt;option value="admin"&gt;Admin&lt;/option&gt;
+  &lt;option value="editor"&gt;Editor&lt;/option&gt;
+&lt;/select&gt;
+
+const query = ae.signal('');
+const note = ae.signal('');
+const role = ae.signal('editor');
+
+ae('query').input(query);
+ae('note').input(note);
+ae('role').input(role);
+
+// derived state, never a second copy of the string
+const hits = ae.computed(() =&gt;
+  INDEX.filter((row) =&gt; row.title.includes(query.value)));</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — a text field always reads back a string. Bind a
+          <code class="doc-code">Signal&lt;number&gt;</code> to one and the first write shows <code class="doc-code">String(v)</code>, but the
+          first keystroke replaces the number with a string and every consumer downstream starts doing string math. If you want numbers, use
+          <a class="doc-link" href="forms.html#number">type=number</a>.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Gotcha</strong> — a single
+          <code class="doc-code">&lt;select&gt;</code> can only show a value some <code class="doc-code">&lt;option&gt;</code> carries. Write an
+          unmatched string and the browser leaves the control with nothing selected while the signal keeps the value, so the two disagree until
+          the next edit. Populate the options first, then set the signal.</div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <section id="checkbox" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">input[type=checkbox]</code>
+          <span class="ml-1 font-mono text-[13px] text-stone-400">Signal&lt;boolean&gt;</span>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">A checkbox binds <code class="doc-code">el.checked</code>, so the signal is a real boolean
+          you can feed straight into <a class="doc-link" href="bindings.html#show">.show</a>,
+          <a class="doc-link" href="bindings.html#cls">.cls</a> or an <a class="doc-link" href="bindings.html#attr">.attr</a> without a
+          truthiness dance.</p>
+
+        <div class="doc-sig mt-5">&lt;input type="checkbox"&gt;   ↔   Signal&lt;boolean&gt;   via  el.checked</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">reads</dt><dd class="text-stone-600"><code class="doc-code">el.checked</code> on <code class="doc-code">input</code> and <code class="doc-code">change</code></dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">writes</dt><dd class="text-stone-600"><code class="doc-code">el.checked = !!v</code>, skipped when it already matches</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;label&gt;&lt;input data-ae="agree" type="checkbox"&gt; I accept the terms&lt;/label&gt;
+&lt;button data-ae="continue"&gt;Continue&lt;/button&gt;
+
+const agree = ae.signal(false);
+
+ae('agree').input(agree);
+ae('continue').attr('disabled', () =&gt; (agree.value ? null : true));</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — the <code class="doc-code">value=</code>
+          attribute is ignored here. A checkbox speaks <code class="doc-code">checked</code>, so <code class="doc-code">value="yes"</code> changes
+          nothing and any truthy signal value checks the box. ae never touches <code class="doc-code">indeterminate</code> either — set and clear
+          it yourself.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Gotcha</strong> — checkbox mode is boolean-only, so a bank of
+          boxes collecting a set of values is not one <code class="doc-code">Signal&lt;string[]&gt;</code>. Give each box its own boolean signal,
+          or keep the array yourself with <a class="doc-link" href="bindings.html#on">.on('change')</a> and <em>replace</em> it — an
+          <a class="doc-link" href="forms.html#multi-select">array-typed signal</a> belongs to <code class="doc-code">&lt;select multiple&gt;</code>.</div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <section id="number" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">input[type=number|range]</code>
+          <span class="ml-1 font-mono text-[13px] text-stone-400">Signal&lt;number&gt;</span>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Both numeric controls bind <code class="doc-code">el.valueAsNumber</code>, so arithmetic
+          downstream is arithmetic — no <code class="doc-code">parseInt</code>, no accidental <code class="doc-code">"3" + 1 === "31"</code>.
+          Point a number field and a range at the same name and they drive one signal, each following the other.</p>
+
+        <div class="doc-sig mt-5">&lt;input type="number"&gt; · &lt;input type="range"&gt;   ↔   Signal&lt;number&gt;   via  el.valueAsNumber</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">reads</dt><dd class="text-stone-600"><code class="doc-code">el.valueAsNumber</code> — <code class="doc-code">NaN</code> while the field is empty or unparseable</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">writes</dt><dd class="text-stone-600"><code class="doc-code">el.valueAsNumber = Number(v)</code>; writing <code class="doc-code">NaN</code> clears the field</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;input data-ae="seats" type="number" min="1" max="50"&gt;
+&lt;input data-ae="seats" type="range"  min="1" max="50"&gt;
+&lt;span data-ae="total"&gt;&lt;/span&gt;
+
+const seats = ae.signal(3);
+
+ae('seats').input(seats);                  // both fields, one signal
+
+// an empty field reads as NaN — guard once, at the edge
+const count = ae.computed(() =&gt;
+  Number.isNaN(seats.value) ? 0 : seats.value);
+
+ae('total').text(() =&gt; `$${count.value * PRICE_PER_SEAT}`);</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — clear the field and the signal holds
+          <code class="doc-code">NaN</code>, which poisons every sum it touches and prints as <code class="doc-code">"NaN"</code> through
+          <a class="doc-link" href="bindings.html#text">.text</a>. Guard it where the value enters your logic, as above. The reverse works too:
+          assigning <code class="doc-code">NaN</code> empties the field, and since <code class="doc-code">Object.is(NaN, NaN)</code> is
+          <code class="doc-code">true</code>, the echo guard leaves an empty field alone instead of rewriting it on every flush.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Gotcha</strong> — ae never clamps or validates.
+          <code class="doc-code">min</code>, <code class="doc-code">max</code>, <code class="doc-code">step</code> and
+          <code class="doc-code">:invalid</code> stay the browser's business: a range control keeps itself inside its bounds, but a number input
+          hands you whatever was typed — <code class="doc-code">999</code> in a <code class="doc-code">max="50"</code> field reaches the signal
+          unchanged.</div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <section id="radio" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">input[type=radio]</code>
+          <span class="ml-1 font-mono text-[13px] text-stone-400">Signal&lt;string&gt;</span>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Give every radio in the group the same <code class="doc-code">data-ae</code> name and an
+          explicit <code class="doc-code">value=</code>: the signal then holds the group's value. Checking a radio writes its own value to the
+          signal; a signal write re-checks the radio whose value matches. Each radio gets its own binding that only ever sets its own
+          checkedness, which is why the group behaves like a group without ae knowing anything about groups.</p>
+
+        <div class="doc-sig mt-5">&lt;input type="radio" value="…"&gt;   ↔   Signal&lt;string&gt;   via  the checked radio's value</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">reads</dt><dd class="text-stone-600">the value of the radio that fired, and only while it is checked</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">writes</dt><dd class="text-stone-600">per radio: <code class="doc-code">el.checked = (el.value === v)</code></dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;label&gt;&lt;input data-ae="tier" type="radio" name="tier" value="free"&gt;  Free&lt;/label&gt;
+&lt;label&gt;&lt;input data-ae="tier" type="radio" name="tier" value="pro"&gt;   Pro&lt;/label&gt;
+&lt;label&gt;&lt;input data-ae="tier" type="radio" name="tier" value="scale"&gt; Scale&lt;/label&gt;
+&lt;span data-ae="price"&gt;&lt;/span&gt;
+
+const tier = ae.signal('pro');   // the group's value lives here
+
+ae('tier').input(tier);
+ae('price').text(() =&gt; `$${PRICE[tier.value] ?? 0}/mo`);
+
+tier.value = '';                 // no radio matches — all of them uncheck</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — set <code class="doc-code">value=</code> on
+          every radio. A radio without one reports <code class="doc-code">"on"</code>, so the whole group would read and write the same string
+          and the signal could never tell them apart.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Guarantee</strong> — exclusivity comes from the signal, not from
+          <code class="doc-code">name=</code>. Bound radios stay mutually exclusive with no <code class="doc-code">name</code> attribute at all
+          (the live demo above has none), and a signal value no radio carries unchecks every bound radio; an unbound radio that merely shares a
+          native <code class="doc-code">name</code> is never touched. Keep <code class="doc-code">name=</code> anyway — form submission and
+          native arrow-key navigation still want it. Both <code class="doc-code">input</code> and <code class="doc-code">change</code> fire on
+          the radio you just checked, and both assign the same string — the signal's own <code class="doc-code">Object.is</code> guard makes the
+          second one a no-op, so the pair lands as a single notification. Events from a radio that is not checked are ignored outright.</div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <section id="multi-select" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">select[multiple]</code>
+          <span class="ml-1 font-mono text-[13px] text-stone-400">Signal&lt;string[]&gt;</span>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">A multi-select binds the selection to a <code class="doc-code">Signal&lt;string[]&gt;</code>.
+          Reads collect <code class="doc-code">selectedOptions</code> in option order; writes select every option whose value appears in the
+          array and deselect the rest. The array is treated as a set, so duplicate option values toggle together.</p>
+
+        <div class="doc-sig mt-5">&lt;select multiple&gt;   ↔   Signal&lt;string[]&gt;   via  selectedOptions, in option order</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">reads</dt><dd class="text-stone-600">a fresh array of the selected values, always in document order</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">writes</dt><dd class="text-stone-600"><code class="doc-code">opt.selected = set.has(opt.value)</code> for every option; skipped when the selection already matches element-wise</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;select data-ae="regions" multiple size="3"&gt;
+  &lt;option value="eu"&gt;EU&lt;/option&gt;
+  &lt;option value="us"&gt;US&lt;/option&gt;
+  &lt;option value="apac"&gt;APAC&lt;/option&gt;
+&lt;/select&gt;
+
+const regions = ae.signal(['eu']);
+
+ae('regions').input(regions);
+
+// toggling from code: replace the array, never mutate it
+const toggle = (v) =&gt; {
+  regions.value = regions.value.includes(v)
+    ? regions.value.filter((r) =&gt; r !== v)
+    : [...regions.value, v];
+};</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — a new array, or nothing happens.
+          <code class="doc-code">regions.value.push('us')</code> mutates the array in place, the setter sees the same reference,
+          <code class="doc-code">Object.is</code> says equal, and no subscriber is ever notified. Same rule as every other
+          <a class="doc-link" href="reactivity.html#signal-value">signal write</a>: replace, don't mutate.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Detail</strong> — order is the options', not yours. Write
+          <code class="doc-code">['us', 'eu']</code> and both options select, but the next read comes back as
+          <code class="doc-code">['eu', 'us']</code>. Compare selections as sets, not as strings.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Guarantee</strong> — one gesture fires
+          <code class="doc-code">input</code> and <code class="doc-code">change</code> with two distinct arrays that
+          <code class="doc-code">Object.is</code> cannot dedupe, so this mode compares element by element in both directions. An unchanged
+          selection therefore never re-notifies and never feeds the <a class="doc-link" href="reactivity.html#tracking">flush breaker</a>.</div>
+
+        <div class="doc-card mt-6">
+          <p class="doc-eyebrow">live · mutate vs. replace</p>
+          <p class="mt-2 text-sm leading-relaxed text-stone-600">Push into the array and nothing moves — not the selection, not the readout.
+            Assign a copy and the same contents suddenly land everywhere.</p>
+          <div class="mt-4 flex flex-wrap items-start gap-4">
+            <select data-ae="f-tags" multiple size="3" class="demo-field w-32">
+              <option value="html">html</option>
+              <option value="css">css</option>
+              <option value="svg">svg</option>
+            </select>
+            <div class="flex flex-col gap-2">
+              <button data-ae="f-tags-push" class="demo-btn font-mono text-[12px]">tags.value.push('css')</button>
+              <button data-ae="f-tags-copy" class="demo-btn font-mono text-[12px]">tags.value = [...tags.value]</button>
+            </div>
+            <p class="font-mono text-[13px] text-stone-500">signal → <span data-ae="f-tags-json" class="text-amber-900"></span></p>
+          </div>
+        </div>
+      </section>
+
+      <nav class="flex flex-wrap items-center justify-between gap-4 border-t border-stone-200/70 pt-8 font-medium">
+        <a class="doc-link" href="bindings.html">&larr; Rendering &amp; events</a>
+        <a class="doc-link" href="lists.html">Lists &rarr;</a>
+      </nav>
+    </main>
+
+    <!-- ===== sidebar (source order after main so mobile reads content first) ===== -->
+    <aside class="mt-16 border-t border-stone-200/70 pt-8 text-sm lg:sticky lg:top-[57px] lg:order-first lg:mt-0 lg:max-h-[calc(100vh-57px)] lg:self-start lg:overflow-y-auto lg:border-0 lg:pb-10 lg:pt-8">
+      <nav aria-label="API reference">
+        <p class="px-2 font-mono text-[11px] uppercase tracking-widest text-stone-400">Every member</p>
+
+        <a href="reference.html" class="mt-4 block px-2 font-medium text-stone-600 hover:text-ink">Handles &amp; lifecycle</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="reference.html#handle">ae(name)</a></li>
+          <li><a class="doc-toc" href="reference.html#handle-scoped">ae(name, root)</a></li>
+          <li><a class="doc-toc" href="reference.html#mount">.mount(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#scope">.scope(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#els">.els</a></li>
+          <li><a class="doc-toc" href="reference.html#each">.each(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#parts">ae.parts(root)</a></li>
+          <li><a class="doc-toc" href="reference.html#item-of">ae.itemOf(el)</a></li>
+          <li><a class="doc-toc" href="reference.html#observe">ae.observe(root)</a></li>
+          <li><a class="doc-toc" href="reference.html#semantics">Semantics</a></li>
+        </ul>
+
+        <a href="reactivity.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Signals &amp; scheduling</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="reactivity.html#signal">ae.signal(v)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#signal-value">Signal.value</a></li>
+          <li><a class="doc-toc" href="reactivity.html#computed">ae.computed(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#effect">ae.effect(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#is-signal">ae.isSignal(v)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#settled">ae.settled()</a></li>
+          <li><a class="doc-toc" href="reactivity.html#transition">ae.transition(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#reactive-type">Reactive&lt;T&gt;</a></li>
+          <li><a class="doc-toc" href="reactivity.html#tracking">Tracking rules</a></li>
+        </ul>
+
+        <a href="bindings.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Rendering &amp; events</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="bindings.html#render">.render(fn)</a></li>
+          <li><a class="doc-toc" href="bindings.html#text">.text(v)</a></li>
+          <li><a class="doc-toc" href="bindings.html#cls">.cls(name, on?)</a></li>
+          <li><a class="doc-toc" href="bindings.html#attr">.attr(name, v)</a></li>
+          <li><a class="doc-toc" href="bindings.html#show">.show(on)</a></li>
+          <li><a class="doc-toc" href="bindings.html#press">.press(fn)</a></li>
+          <li><a class="doc-toc" href="bindings.html#hover">.hover(enter, leave)</a></li>
+          <li><a class="doc-toc" href="bindings.html#on">.on(type, fn, opts)</a></li>
+        </ul>
+
+        <a href="forms.html" class="mt-6 block px-2 font-medium text-amber-800" aria-current="page">Forms</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="forms.html#input">.input(signal)</a></li>
+          <li><a class="doc-toc" href="forms.html#text-fields">text · textarea · select</a></li>
+          <li><a class="doc-toc" href="forms.html#checkbox">checkbox</a></li>
+          <li><a class="doc-toc" href="forms.html#number">number · range</a></li>
+          <li><a class="doc-toc" href="forms.html#radio">radio groups</a></li>
+          <li><a class="doc-toc" href="forms.html#multi-select">select multiple</a></li>
+        </ul>
+
+        <a href="lists.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Lists</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="lists.html#list">.list(items, render, key)</a></li>
+          <li><a class="doc-toc" href="lists.html#template">The template</a></li>
+          <li><a class="doc-toc" href="lists.html#keys">Keys</a></li>
+          <li><a class="doc-toc" href="lists.html#reconciliation">Reconciliation</a></li>
+          <li><a class="doc-toc" href="lists.html#nested">Nested lists</a></li>
+          <li><a class="doc-toc" href="lists.html#animating">Animating changes</a></li>
+        </ul>
+
+        <p class="mt-8 px-2 text-[12px] leading-relaxed text-stone-400">
+          Every example on these pages runs against the same
+          <a href="../dist/ae.js" class="underline decoration-stone-300 underline-offset-2 hover:text-stone-600">dist/ae.js</a>
+          the demos load.
+        </p>
+      </nav>
+    </aside>
+  </div>
+
+  <!-- ===== footer ===== -->
+  <footer class="border-t border-stone-200/70">
+    <div class="mx-auto flex max-w-none flex-wrap items-center gap-x-6 gap-y-2 px-6 py-10 text-sm text-stone-500 xl:px-12">
+      <a href="index.html" class="flex items-center gap-2 font-display text-lg font-semibold text-stone-500 transition-colors hover:text-ink">
+        <img src="logo.svg" alt="" class="h-5 w-[1.75rem] opacity-80">
+        <span>ae</span>
+      </a>
+      <span>MIT license</span>
+      <span>3.9 KB min+gzip</span>
+      <a href="../API.md" class="transition hover:text-ink">API.md</a>
+      <a href="https://www.npmjs.com/package/@aeroapp/ae" class="transition hover:text-ink">npm</a>
+      <a href="https://github.com/nft/ae" class="transition hover:text-ink">GitHub</a>
+      <span class="ml-auto">This page runs on ae — view source.</span>
+    </div>
+  </footer>
+
+  <script type="importmap">{ "imports": { "@aeroapp/ae": "../dist/ae.js" } }</script>
+  <script type="module" src="docs.js"></script>
+  <script type="module">
+    import { ae } from '@aeroapp/ae';
+
+    // --- one signal per field kind, one readout ---------------------------------
+    const form = {
+      name: ae.signal('Ada'),
+      role: ae.signal('editor'),
+      bio: ae.signal('HTML is the source of truth.'),
+      seats: ae.signal(3),
+      yearly: ae.signal(false),
+      tier: ae.signal('pro'),
+      regions: ae.signal(['eu']),
+    };
+    for (const [key, sig] of Object.entries(form)) ae('f-' + key).input(sig);
+
+    // JSON.stringify renders NaN as null; print it as typed so an emptied
+    // number field reads honestly.
+    const LABEL_WIDTH = 9;
+    const show = (v) => (typeof v === 'number' && Number.isNaN(v) ? 'NaN' : JSON.stringify(v));
+    ae('f-json').text(() => Object.entries(form)
+      .map(([key, sig]) => `${(key + ':').padEnd(LABEL_WIDTH)}${show(sig.value)}`)
+      .join('\n'));
+
+    // --- multi-select: only a new array notifies ---------------------------------
+    const tags = ae.signal(['html']);
+    ae('f-tags').input(tags);
+    ae('f-tags-json').text(() => JSON.stringify(tags.value));
+    ae('f-tags-push').press(() => { if (!tags.value.includes('css')) tags.value.push('css'); });
+    ae('f-tags-copy').press(() => { tags.value = [...tags.value]; });
+  </script>
+</body>
+</html>

@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Signals &amp; scheduling — ae reference</title>
+  <meta name="description" content="ae's reactivity core: ae.signal, Signal.value, ae.computed, ae.effect, ae.isSignal, ae.settled, ae.transition, the Reactive union, and the tracking rules behind them.">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Committed static build (theme + @apply utilities live in
+       site/tailwind.config.js and site/tailwind.in.css).
+       Regenerate after class changes: bun run site:css -->
+  <link rel="stylesheet" href="tailwind.css">
+</head>
+<body class="overflow-x-clip bg-cream font-sans text-ink antialiased">
+
+  <!-- ===== nav ===== -->
+  <nav class="sticky top-0 z-10 border-b border-stone-200/70 bg-cream/85 backdrop-blur">
+    <div class="mx-auto flex max-w-none items-center gap-6 px-6 py-3 xl:px-12">
+      <a href="index.html" class="flex items-center gap-2.5 font-display text-2xl font-semibold tracking-tight text-ink transition-colors hover:text-[#a41821]">
+        <img src="logo.svg" alt="" class="h-8 w-[2.8rem]">
+        <span>ae</span>
+      </a>
+      <span class="hidden rounded-full border border-amber-700/25 bg-amber-700/5 px-2.5 py-0.5 font-mono text-[11px] text-amber-800 sm:inline">reference</span>
+      <div class="ml-auto flex items-baseline gap-6 text-sm text-stone-500">
+        <a href="index.html#cases" class="hidden transition hover:text-ink sm:inline">Tour</a>
+        <a href="index.html#kanban" class="hidden transition hover:text-ink sm:inline">Kanban</a>
+        <a href="https://www.npmjs.com/package/@aeroapp/ae" class="hidden transition hover:text-ink sm:inline">npm</a>
+        <a href="https://github.com/nft/ae" class="transition hover:text-ink">GitHub</a>
+        <a href="../API.md" class="rounded-lg border border-stone-300 px-3 py-1.5 font-medium text-stone-700 transition hover:border-amber-700 hover:text-amber-800">API.md</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="mx-auto grid max-w-none gap-x-12 px-6 pb-16 pt-10 xl:px-12 lg:grid-cols-[15rem_minmax(0,1fr)]">
+
+    <!-- ===== page ===== -->
+    <main class="min-w-0 max-w-3xl space-y-12">
+      <header>
+        <span class="doc-eyebrow">reference · 2 of 5</span>
+        <h1 class="mt-3 font-display text-4xl font-medium tracking-tight">Signals &amp; scheduling</h1>
+        <p class="mt-4 text-lg leading-relaxed text-stone-600">Signals are the state layer every binding sits on. This page covers the three primitives — <code class="doc-code">ae.signal</code>, <code class="doc-code">ae.computed</code>, <code class="doc-code">ae.effect</code> — the <code class="doc-code">Reactive&lt;T&gt;</code> union the helpers accept, and the scheduler around them: when a write lands, what re-runs, how to wait for the DOM to catch up, and how to animate the change.</p>
+        <div class="mt-6 flex flex-wrap gap-2">
+          <a href="#signal" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae.signal</a>
+          <a href="#signal-value" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">Signal.value</a>
+          <a href="#computed" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae.computed</a>
+          <a href="#effect" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae.effect</a>
+          <a href="#is-signal" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae.isSignal</a>
+          <a href="#settled" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae.settled</a>
+          <a href="#transition" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae.transition</a>
+          <a href="#reactive-type" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">Reactive&lt;T&gt;</a>
+          <a href="#tracking" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">Tracking rules</a>
+        </div>
+      </header>
+
+      <!-- ===== ae.signal ===== -->
+      <section id="signal" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight"><code class="font-mono text-[21px] text-amber-900">ae.signal(initial)</code></h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Creates the one writable reactive container in ae: an object whose entire public surface is the property <code class="doc-code">.value</code>. Read it inside a tracked run and you subscribe; write it and every subscriber is scheduled. There is no subscribe method, no peek, no equality option to configure.</p>
+
+        <div class="doc-sig mt-5">ae.signal&lt;T&gt;(initial: T): Signal&lt;T&gt;</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">initial</dt><dd class="text-stone-600">the starting value; any type, stored as given — never cloned, never made deeply reactive</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">a <code class="doc-code">Signal&lt;T&gt;</code>. The class is exported too, so <code class="doc-code">new Signal(0)</code> is the same object</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">import { ae } from '@aeroapp/ae';
+
+const count = ae.signal(0);
+const draft = ae.signal('');
+const todos = ae.signal([{ id: 1, text: 'Ship it' }]);
+
+count.value++;        // write
+todos.value.length;   // read</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Shallow by design</strong> — a signal holds one reference. Nothing inside an object or array is reactive on its own, so state changes are expressed by replacing the value; see <a class="doc-link" href="reactivity.html#signal-value">Signal.value</a>.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Where to put them</strong> — a module-level signal is application state shared by every element bound to it. A signal created inside <a class="doc-link" href="reference.html#scope">.scope</a> is private per widget instance and dies with its root.</div>
+      </section>
+
+      <!-- ===== Signal.value ===== -->
+      <section id="signal-value" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight"><code class="font-mono text-[21px] text-amber-900">Signal.value</code></h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Reading <code class="doc-code">.value</code> inside a render, effect, computed or function-form helper subscribes that run to the signal. Writing it schedules every subscriber for the next microtask — three writes in one task produce one flush and one re-render. A write whose value is <code class="doc-code">Object.is</code>-equal to the current one is dropped before anything is scheduled.</p>
+
+        <div class="doc-sig mt-5">get value(): T      // tracked inside .render / .list / ae.effect / ae.computed
+set value(next: T)  // Object.is-guarded; subscribers flush on the next microtask</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">get</dt><dd class="text-stone-600">the current value, plus a subscription whenever a tracked run is active</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">set</dt><dd class="text-stone-600">stores the value and queues subscribers; each affected run executes at most once per batch — three writes, one run</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">const count = ae.signal(0);
+
+ae('count').render((el) =&gt; {
+  el.textContent = count.value;   // tracked — this render is now a subscriber
+});
+
+count.value++;    // three writes in one task …
+count.value++;
+count.value++;    // … one flush, one render, on the next microtask
+
+count.value = 3;  // already 3 — no-op, nothing is scheduled</code></pre>
+
+        <p class="mt-5 leading-relaxed text-stone-600">The equality guard is why collections are replaced rather than mutated: a pushed array is still the same array, so the write never happens.</p>
+
+        <pre class="doc-pre mt-4"><code class="hl">const todos = ae.signal([{ id: 1, done: false }]);
+
+todos.value.push({ id: 2, done: false });   // same reference — silent
+todos.value[0].done = true;                 // same reference — silent
+
+todos.value = [...todos.value, { id: 2, done: false }];   // notifies
+todos.value = todos.value.map((t) =&gt;                      // notifies
+  t.id === 1 ? { ...t, done: true } : t);</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Gotcha</strong> — the DOM is one microtask behind. On the line after a write the element still shows the old text; use <a class="doc-link" href="reactivity.html#settled">ae.settled()</a> before reading it back. And the guard is <code class="doc-code">Object.is</code>, not <code class="doc-code">===</code>: writing <code class="doc-code">NaN</code> over <code class="doc-code">NaN</code> is a no-op, while writing <code class="doc-code">-0</code> over <code class="doc-code">0</code> counts as a change.</div>
+
+        <div class="doc-card mt-6">
+          <p class="font-mono text-[10px] uppercase tracking-widest text-amber-700">live · batching</p>
+          <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <button data-ae="x-inc" class="demo-btn">+1</button>
+            <button data-ae="x-batch" class="demo-btn">+3 in one tick</button>
+            <button data-ae="x-reset" class="demo-btn">reset to 0</button>
+            <span class="font-mono text-[11px] uppercase tracking-widest text-stone-400">count <b data-ae="x-count" class="ml-1 font-display text-xl text-ink"></b></span>
+            <span class="font-mono text-[11px] uppercase tracking-widest text-stone-400">double <b data-ae="x-double" class="ml-1 font-display text-xl text-amber-800"></b></span>
+            <span class="font-mono text-[11px] uppercase tracking-widest text-stone-400">renders <b data-ae="x-renders" class="ml-1 font-display text-xl text-stone-600"></b></span>
+          </div>
+          <p class="mt-3 text-sm leading-relaxed text-stone-500"><em>+3 in one tick</em> writes three times and the render counter moves by one. Press <em>reset to 0</em> twice: the second press writes a value the signal already holds, so the counter does not move at all.</p>
+        </div>
+      </section>
+
+      <!-- ===== ae.computed ===== -->
+      <section id="computed" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight"><code class="font-mono text-[21px] text-amber-900">ae.computed(fn)</code></h2>
+        <p class="mt-3 leading-relaxed text-stone-600">A derived, read-only value. It is lazy: <code class="doc-code">fn</code> does not run until the computed is first read. After that a dependency write marks it stale and it re-evaluates once per flush — or on your next read, so a read immediately after a write is always fresh. Subscribers are notified only when the value actually changed, which is what keeps diamond-shaped graphs from causing spurious renders.</p>
+
+        <div class="doc-sig mt-5">ae.computed&lt;T&gt;(fn: () =&gt; T): Computed&lt;T&gt;</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">fn</dt><dd class="text-stone-600">a pure derivation; every signal or computed read inside becomes a dependency of the last run</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">a <code class="doc-code">Computed&lt;T&gt;</code> — <code class="doc-code">.value</code> has a getter and no setter, and is readable everywhere a signal is</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">const price = ae.signal(24);
+const seats = ae.signal(3);
+const total = ae.computed(() =&gt; price.value * seats.value);
+
+ae('total').text(() =&gt; `$${total.value}`);   // reactive, like any signal
+
+seats.value = 4;
+total.value;   // 96 — reading right after a write is always fresh</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Equality cut-off</strong> — propagation stops at the first value that did not change. <code class="doc-code">ae.computed(() =&gt; Math.min(width.value, 960))</code> re-evaluates when <code class="doc-code">width</code> goes from 1200 to 1400, but its result is still <code class="doc-code">960</code>, so nothing downstream re-runs.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Keep fn pure</strong> — it can run when upstream values turn out unchanged, and a computed nobody currently subscribes to goes cold: dependency writes stop recomputing it until something reads it again. Side effects belong in <a class="doc-link" href="reactivity.html#effect">ae.effect</a>.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Errors</strong> — a throw while re-evaluating during a flush is logged as <code class="doc-code">[ae] computed threw:</code>; subscribers keep the last good value and the computed retries on the next dependency write or read. A throw during an explicit <code class="doc-code">.value</code> read propagates to whoever read it. Either way it never throws at the code that wrote the signal.</div>
+
+        <div class="doc-card mt-6">
+          <p class="font-mono text-[10px] uppercase tracking-widest text-amber-700">live · notify only on real change</p>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <button data-ae="x-down" class="demo-btn">−1°</button>
+            <span data-ae="x-temp" class="font-display text-2xl"></span>
+            <button data-ae="x-up" class="demo-btn">+1°</button>
+            <span data-ae="x-warm" class="rounded-full bg-amber-700/10 px-3 py-1 font-mono text-[12px] text-amber-900"></span>
+            <span class="font-mono text-[12px] text-stone-400">renders: <b data-ae="x-notifies" class="text-stone-600"></b></span>
+          </div>
+          <p class="mt-3 text-sm leading-relaxed text-stone-500">The badge renders <code class="doc-code">ae.computed(() =&gt; temp.value &gt;= 21)</code>. Every press writes the temperature, but the render counter only moves on the press that crosses 21 — the one press where the computed's value differs.</p>
+        </div>
+      </section>
+
+      <!-- ===== ae.effect ===== -->
+      <section id="effect" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight"><code class="font-mono text-[21px] text-amber-900">ae.effect(fn)</code></h2>
+        <p class="mt-3 leading-relaxed text-stone-600">An auto-tracked side effect that is not tied to an element. It runs <code class="doc-code">fn</code> immediately, re-runs it whenever a signal it read changes — batched, so three writes in one task produce one re-run — and returns a disposer. Reach for it for work outside the DOM — persistence, logging, firing a fetch when a filter changes.</p>
+
+        <div class="doc-sig mt-5">ae.effect(fn: () =&gt; void): Cleanup        // type Cleanup = () =&gt; void</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">fn</dt><dd class="text-stone-600">the effect body; its dependencies are re-collected on every run</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">a <code class="doc-code">Cleanup</code> that unsubscribes the effect and cancels a run already queued for the current flush</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">const filter = ae.signal(localStorage.getItem('filter') ?? 'all');
+
+const stopSaving = ae.effect(() =&gt; {
+  localStorage.setItem('filter', filter.value);   // now, and on every change
+});
+
+ae('filter-all').press(() =&gt; { filter.value = 'all'; });
+
+stopSaving();   // disposal is absolute — it never runs again</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">The one un-isolated error</strong> — if the <em>initial</em> run throws, the error propagates to your call site and the effect leaves no trace: nothing subscribed, nothing queued. Throws in later runs are logged as <code class="doc-code">[ae] effect threw:</code> and the rest of the batch still runs. Element bindings are isolated even on their first run — see <a class="doc-link" href="bindings.html#render">.render</a>.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Prefer .render for element work</strong> — an effect that writes to an element is not disposed when that element leaves the DOM, so it keeps running against a detached node. <a class="doc-link" href="bindings.html#render">.render</a> is the same machinery with the element's lifetime attached. An effect that writes a signal it also reads trips the <a class="doc-link" href="reactivity.html#tracking">runaway guard</a>.</div>
+      </section>
+
+      <!-- ===== ae.isSignal ===== -->
+      <section id="is-signal" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight"><code class="font-mono text-[21px] text-amber-900">ae.isSignal(v)</code></h2>
+        <p class="mt-3 leading-relaxed text-stone-600">True for <code class="doc-code">Signal</code> and <code class="doc-code">Computed</code> instances, false for everything else. This is the test the imperative helpers run to decide between applying a value once and wiring it reactively — and the test to run in helpers of your own that accept a <a class="doc-link" href="reactivity.html#reactive-type">Reactive&lt;T&gt;</a>.</p>
+
+        <div class="doc-sig mt-5">ae.isSignal(v: unknown): v is ReadableSignal&lt;unknown&gt;   // Signal&lt;T&gt; | Computed&lt;T&gt;</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">v</dt><dd class="text-stone-600">any value</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">a type guard narrowing <code class="doc-code">v</code> to <code class="doc-code">ReadableSignal&lt;unknown&gt;</code></dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">// A title helper that accepts a plain string, a signal, or a function.
+function bindTitle(name, v) {
+  ae(name).mount((el) =&gt; {
+    if (ae.isSignal(v)) return ae.effect(() =&gt; { el.title = String(v.value); });
+    if (typeof v === 'function') return ae.effect(() =&gt; { el.title = String(v(el)); });
+    el.title = String(v);
+  });
+}</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">It is an instanceof check</strong> — a signal created by a second, separately loaded copy of ae fails it and would be treated as a plain value. Load one copy of the library per page.</div>
+      </section>
+
+      <!-- ===== ae.settled ===== -->
+      <section id="settled" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight"><code class="font-mono text-[21px] text-amber-900">ae.settled()</code></h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Resolves once pending signal writes — and everything they cascade into: list stamping, the mount pipeline, effects scheduled by those mounts — have drained and the DOM is final. It re-checks on a macrotask, so <code class="doc-code">MutationObserver</code> deliveries, which is how ae learns about new elements, land between the hops.</p>
+
+        <div class="doc-sig mt-5">ae.settled(): Promise&lt;void&gt;</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">a promise resolving when nothing is scheduled and no flush is in progress</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">todos.value = [...todos.value, { id: 4, text: 'Ship it' }];
+
+await ae.settled();   // stamped, mounted, every cascade drained
+
+// stamps sit at the end of the container, in item order
+const rows = list.querySelectorAll('li');   // the &lt;template&gt; never matches
+assert(rows.length === 4);
+assert(rows[3].querySelector('[data-ae="title"]').textContent === 'Ship it');</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">What it waits for</strong> — ae's own scheduler, and nothing else: your fetches, timers, CSS transitions and image loads are invisible to it. It also costs at least one macrotask even when nothing is pending, so it is a tool for tests and orchestration, not for a hot path. <a class="doc-link" href="reactivity.html#transition">ae.transition</a> awaits it internally.</div>
+      </section>
+
+      <!-- ===== ae.transition ===== -->
+      <section id="transition" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight"><code class="font-mono text-[21px] text-amber-900">ae.transition(fn)</code></h2>
+        <p class="mt-3 leading-relaxed text-stone-600">Runs <code class="doc-code">fn</code> inside <code class="doc-code">document.startViewTransition</code>, so every DOM change its signal writes cause — stamps, removals, reorders, text — is animated by the browser. The "new" snapshot is taken only after ae has settled: the flush <em>and</em> the mount pipeline, including writes that mount bindings cascade into. Where View Transitions are unsupported, <code class="doc-code">fn</code> runs plainly and the return value is <code class="doc-code">undefined</code> — an enhancement, never a requirement.</p>
+
+        <div class="doc-sig mt-5">ae.transition(fn: () =&gt; void): ViewTransition | undefined</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">fn</dt><dd class="text-stone-600">the mutation — typically one or more signal writes</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the browser's transition object (<code class="doc-code">ready</code>, <code class="doc-code">finished</code>, <code class="doc-code">updateCallbackDone</code>, <code class="doc-code">skipTransition()</code>), or <code class="doc-code">undefined</code> on the fallback path</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;div data-ae="deck"&gt;
+  &lt;template&gt;&lt;span class="chip"&gt;&lt;/span&gt;&lt;/template&gt;
+&lt;/div&gt;
+
+ae('deck').list(chips, (el, chip) =&gt; {
+  el.textContent = chip.label;
+  el.style.viewTransitionName = `chip-${chip.id}`;   // unique name → morph
+}, (chip) =&gt; chip.id);
+
+ae('mix').press(() =&gt; ae.transition(() =&gt; {
+  chips.value = shuffled(chips.value);
+}));</code></pre>
+
+        <p class="mt-5 leading-relaxed text-stone-600">The animation itself is pure CSS, and nothing in ae reads <code class="doc-code">prefers-reduced-motion</code> for you:</p>
+
+        <pre class="doc-pre mt-4"><code class="hl">::view-transition-group(*) { animation-duration: 250ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+}</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Give moving nodes a name</strong> — a unique <code class="doc-code">view-transition-name</code> makes the browser morph the old element into the new one, including across two <a class="doc-link" href="lists.html#list">.list</a> containers, where the item is really a removal plus a fresh stamp. See <a class="doc-link" href="lists.html#animating">animating changes</a>, and the chip deck and kanban board on the <a class="doc-link" href="index.html#cases">tour</a> for both, live.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Gotcha</strong> — on the supported path the browser decides when to invoke the callback, so the DOM is not necessarily updated by the time <code class="doc-code">ae.transition</code> returns. Await <code class="doc-code">updateCallbackDone</code> — or <a class="doc-link" href="reactivity.html#settled">ae.settled()</a> — if the next step depends on it.</div>
+      </section>
+
+      <!-- ===== Reactive<T> ===== -->
+      <section id="reactive-type" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight"><code class="font-mono text-[21px] text-amber-900">Reactive&lt;T&gt;</code></h2>
+        <p class="mt-3 leading-relaxed text-stone-600">The union the imperative helpers accept — <a class="doc-link" href="bindings.html#text">.text</a>, <a class="doc-link" href="bindings.html#cls">.cls</a>, <a class="doc-link" href="bindings.html#attr">.attr</a>, <a class="doc-link" href="bindings.html#show">.show</a>, and <a class="doc-link" href="lists.html#list">.list</a> for its items. Three shapes, one rule: if the value can change, hand over something that can be read again.</p>
+
+        <div class="doc-sig mt-5">type Reactive&lt;T&gt; = T | ReadableSignal&lt;T&gt; | ((el: HTMLElement) =&gt; T)</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">T</dt><dd class="text-stone-600">a plain value — applied once per element, when that element mounts</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">signal</dt><dd class="text-stone-600">a <code class="doc-code">Signal&lt;T&gt;</code> or <code class="doc-code">Computed&lt;T&gt;</code> — applied inside an effect, so it re-applies on change</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">(el) =&gt; T</dt><dd class="text-stone-600">a function of the element, run inside an auto-tracked effect: any signal it reads makes it reactive</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">const count = ae.signal(0);
+const label = ae.computed(() =&gt; `${count.value} items`);
+
+ae('badge')
+  .attr('role', 'status')                    // plain — applied once
+  .text(label)                               // computed — reactive
+  .cls('empty', () =&gt; count.value === 0)     // function — auto-tracked
+  .show(() =&gt; count.value &gt; 0);
+
+ae('row').text((el) =&gt; el.dataset.fallback); // the function gets the element</code></pre>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">"Once" means once per element</strong> — a plain value is applied again to every element that mounts later under the same name, because the helper is a binding that runs per element. It is non-reactive only with respect to <em>signals</em>.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Gotcha</strong> — the function form is only as reactive as what it reads: <code class="doc-code">() =&gt; someObject.count</code> is read once and never again, <code class="doc-code">() =&gt; countSignal.value</code> re-runs. <a class="doc-link" href="bindings.html#cls">.cls</a> is the one helper whose reactive argument is optional — with <code class="doc-code">on</code> omitted it is a one-shot <code class="doc-code">classList.toggle</code>.</div>
+      </section>
+
+      <!-- ===== tracking ===== -->
+      <section id="tracking" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">Tracking rules &amp; the runaway guard</h2>
+        <p class="mt-3 leading-relaxed text-stone-600">There is no dependency array anywhere in ae. While a tracked run is executing, every <code class="doc-code">.value</code> read registers that run as a subscriber — and the dependency set is rebuilt from scratch on <em>every</em> run, so only the signals read on the last run are dependencies.</p>
+
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <div class="doc-card">
+            <h3 class="font-medium">Tracked</h3>
+            <ul class="mt-2 space-y-1 text-sm leading-relaxed text-stone-600">
+              <li><code class="doc-code">.render(fn)</code></li>
+              <li><code class="doc-code">.list</code> render callbacks, and the function form of its <code class="doc-code">items</code></li>
+              <li><code class="doc-code">ae.effect(fn)</code> and <code class="doc-code">ae.computed(fn)</code></li>
+              <li>function-form helper values, <code class="doc-code">(el) =&gt; value</code></li>
+              <li><code class="doc-code">ae.itemOf(el)</code>, read inside any of the above</li>
+            </ul>
+          </div>
+          <div class="doc-card">
+            <h3 class="font-medium">Not tracked</h3>
+            <ul class="mt-2 space-y-1 text-sm leading-relaxed text-stone-600">
+              <li>event handlers — <code class="doc-code">.press</code>, <code class="doc-code">.on</code>, <code class="doc-code">.hover</code></li>
+              <li><code class="doc-code">.mount(fn)</code> and <code class="doc-code">.scope(fn)</code> bodies</li>
+              <li>anything deferred: <code class="doc-code">setTimeout</code>, a promise callback, code after an <code class="doc-code">await</code></li>
+              <li>reads at module top level</li>
+            </ul>
+          </div>
+        </div>
+
+        <p class="mt-5 leading-relaxed text-stone-600">Per-run collection has one consequence worth internalising: a branch that stops reading a signal stops depending on it.</p>
+
+        <pre class="doc-pre mt-4"><code class="hl">const open = ae.signal(false);
+const detail = ae.signal('loading…');
+
+ae('panel').render((el) =&gt; {
+  el.textContent = open.value ? detail.value : 'collapsed';
+});
+
+detail.value = 'ready';   // while `open` is false: nothing re-runs —
+                          // the last run never read `detail`.</code></pre>
+
+        <p class="mt-5 leading-relaxed text-stone-600">Reads in an event handler are the mirror image: they see the current value and subscribe to nothing, which is exactly what you want in <code class="doc-code">.press(() =&gt; { count.value++; })</code>.</p>
+
+        <p class="mt-5 leading-relaxed text-stone-600">A flush drains in cycles: each cycle takes the whole queue at once, so a run is batched to once per cycle — but a write made <em>during</em> that cycle queues its subscribers for the next one. An effect that reads what an earlier effect wrote therefore runs twice in a single flush, and the loop only ends when a cycle queues nothing.</p>
+
+        <div class="doc-note mt-5"><strong class="font-semibold text-amber-900">Runaway guard</strong> — an effect that writes a signal it also reads would loop forever inside one flush. After 100 flush cycles ae clears the queue, logs <code class="doc-code">[ae] update flush aborted after 100 cycles — an effect is probably writing a signal it also reads</code>, and returns. The tab stays responsive; the computeds caught in the abort stay stale until the next dependency write or read. Treat it as a bug report, not a feature.</div>
+
+        <div class="doc-note mt-3"><strong class="font-semibold text-amber-900">Do not nest effects</strong> — an <a class="doc-link" href="reactivity.html#effect">ae.effect</a> created inside a <a class="doc-link" href="bindings.html#render">.render</a> or another effect is a brand new effect on every re-run, and nothing disposes the old ones. Create effects in <a class="doc-link" href="reference.html#mount">.mount</a> or <a class="doc-link" href="reference.html#scope">.scope</a>, where you can return the disposer as the cleanup.</div>
+
+        <div class="doc-card mt-6">
+          <p class="font-mono text-[10px] uppercase tracking-widest text-amber-700">live · dependencies are per run</p>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <button data-ae="x-a" class="demo-btn">A +1</button>
+            <button data-ae="x-b" class="demo-btn">B +1</button>
+            <button data-ae="x-swap" class="demo-btn">read the other one</button>
+            <span data-ae="x-src" class="rounded-lg bg-stone-100/80 px-3 py-1 font-mono text-[13px] text-amber-900"></span>
+            <span class="font-mono text-[12px] text-stone-400">renders: <b data-ae="x-src-renders" class="text-stone-600"></b></span>
+          </div>
+          <p class="mt-3 text-sm leading-relaxed text-stone-500">The render reads one of two signals, chosen by a third. While it displays <code class="doc-code">A</code>, pressing <em>B +1</em> increments B — the value is waiting there when you swap — but the render counter does not move, because B was not a dependency of the last run.</p>
+        </div>
+      </section>
+
+      <nav class="flex flex-wrap items-center justify-between gap-4 border-t border-stone-200/70 pt-8 font-medium">
+        <a class="doc-link" href="reference.html">&larr; Handles &amp; lifecycle</a>
+        <a class="doc-link" href="bindings.html">Rendering &amp; events &rarr;</a>
+      </nav>
+    </main>
+
+    <!-- ===== sidebar (source order after main so mobile reads content first) ===== -->
+    <aside class="mt-16 border-t border-stone-200/70 pt-8 text-sm lg:sticky lg:top-[57px] lg:order-first lg:mt-0 lg:max-h-[calc(100vh-57px)] lg:self-start lg:overflow-y-auto lg:border-0 lg:pb-10 lg:pt-8">
+      <nav aria-label="API reference">
+        <p class="px-2 font-mono text-[11px] uppercase tracking-widest text-stone-400">Every member</p>
+
+        <a href="reference.html" class="mt-4 block px-2 font-medium text-stone-600 hover:text-ink">Handles &amp; lifecycle</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="reference.html#handle">ae(name)</a></li>
+          <li><a class="doc-toc" href="reference.html#handle-scoped">ae(name, root)</a></li>
+          <li><a class="doc-toc" href="reference.html#mount">.mount(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#scope">.scope(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#els">.els</a></li>
+          <li><a class="doc-toc" href="reference.html#each">.each(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#parts">ae.parts(root)</a></li>
+          <li><a class="doc-toc" href="reference.html#item-of">ae.itemOf(el)</a></li>
+          <li><a class="doc-toc" href="reference.html#observe">ae.observe(root)</a></li>
+          <li><a class="doc-toc" href="reference.html#semantics">Semantics</a></li>
+        </ul>
+
+        <a href="reactivity.html" class="mt-6 block px-2 font-medium text-amber-800" aria-current="page">Signals &amp; scheduling</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="reactivity.html#signal">ae.signal(v)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#signal-value">Signal.value</a></li>
+          <li><a class="doc-toc" href="reactivity.html#computed">ae.computed(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#effect">ae.effect(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#is-signal">ae.isSignal(v)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#settled">ae.settled()</a></li>
+          <li><a class="doc-toc" href="reactivity.html#transition">ae.transition(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#reactive-type">Reactive&lt;T&gt;</a></li>
+          <li><a class="doc-toc" href="reactivity.html#tracking">Tracking rules</a></li>
+        </ul>
+
+        <a href="bindings.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Rendering &amp; events</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="bindings.html#render">.render(fn)</a></li>
+          <li><a class="doc-toc" href="bindings.html#text">.text(v)</a></li>
+          <li><a class="doc-toc" href="bindings.html#cls">.cls(name, on?)</a></li>
+          <li><a class="doc-toc" href="bindings.html#attr">.attr(name, v)</a></li>
+          <li><a class="doc-toc" href="bindings.html#show">.show(on)</a></li>
+          <li><a class="doc-toc" href="bindings.html#press">.press(fn)</a></li>
+          <li><a class="doc-toc" href="bindings.html#hover">.hover(enter, leave)</a></li>
+          <li><a class="doc-toc" href="bindings.html#on">.on(type, fn, opts)</a></li>
+        </ul>
+
+        <a href="forms.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Forms</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="forms.html#input">.input(signal)</a></li>
+          <li><a class="doc-toc" href="forms.html#text-fields">text · textarea · select</a></li>
+          <li><a class="doc-toc" href="forms.html#checkbox">checkbox</a></li>
+          <li><a class="doc-toc" href="forms.html#number">number · range</a></li>
+          <li><a class="doc-toc" href="forms.html#radio">radio groups</a></li>
+          <li><a class="doc-toc" href="forms.html#multi-select">select multiple</a></li>
+        </ul>
+
+        <a href="lists.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Lists</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="lists.html#list">.list(items, render, key)</a></li>
+          <li><a class="doc-toc" href="lists.html#template">The template</a></li>
+          <li><a class="doc-toc" href="lists.html#keys">Keys</a></li>
+          <li><a class="doc-toc" href="lists.html#reconciliation">Reconciliation</a></li>
+          <li><a class="doc-toc" href="lists.html#nested">Nested lists</a></li>
+          <li><a class="doc-toc" href="lists.html#animating">Animating changes</a></li>
+        </ul>
+
+        <p class="mt-8 px-2 text-[12px] leading-relaxed text-stone-400">
+          Every example on these pages runs against the same
+          <a href="../dist/ae.js" class="underline decoration-stone-300 underline-offset-2 hover:text-stone-600">dist/ae.js</a>
+          the demos load.
+        </p>
+      </nav>
+    </aside>
+  </div>
+
+  <!-- ===== footer ===== -->
+  <footer class="border-t border-stone-200/70">
+    <div class="mx-auto flex max-w-none flex-wrap items-center gap-x-6 gap-y-2 px-6 py-10 text-sm text-stone-500 xl:px-12">
+      <a href="index.html" class="flex items-center gap-2 font-display text-lg font-semibold text-stone-500 transition-colors hover:text-ink">
+        <img src="logo.svg" alt="" class="h-5 w-[1.75rem] opacity-80">
+        <span>ae</span>
+      </a>
+      <span>MIT license</span>
+      <span>3.9 KB min+gzip</span>
+      <a href="../API.md" class="transition hover:text-ink">API.md</a>
+      <a href="https://www.npmjs.com/package/@aeroapp/ae" class="transition hover:text-ink">npm</a>
+      <a href="https://github.com/nft/ae" class="transition hover:text-ink">GitHub</a>
+      <span class="ml-auto">This page runs on ae — view source.</span>
+    </div>
+  </footer>
+
+  <script type="importmap">{ "imports": { "@aeroapp/ae": "../dist/ae.js" } }</script>
+  <script type="module" src="docs.js"></script>
+  <script type="module">
+    import { ae } from '@aeroapp/ae';
+
+    // --- batching: three writes, one render ------------------------------------
+    const count = ae.signal(0);
+    const double = ae.computed(() => count.value * 2);
+    let renders = 0;
+
+    ae('x-count').render((el) => {
+      renders++;
+      el.textContent = count.value;
+      ae('x-renders').each((r) => { r.textContent = renders; });
+    });
+    ae('x-double').text(double);
+    ae('x-inc').press(() => { count.value++; });
+    ae('x-batch').press(() => { count.value++; count.value++; count.value++; });
+    ae('x-reset').press(() => { count.value = 0; });
+
+    // --- computed: subscribers hear only real changes ---------------------------
+    const temp = ae.signal(18);
+    const warm = ae.computed(() => temp.value >= 21);
+    let notifies = 0;
+
+    ae('x-temp').text(() => `${temp.value}°`);
+    ae('x-warm').render((el) => {
+      notifies++;
+      el.textContent = warm.value ? 'warm' : 'cool';
+      ae('x-notifies').each((n) => { n.textContent = notifies; });
+    });
+    ae('x-up').press(() => { temp.value++; });
+    ae('x-down').press(() => { temp.value--; });
+
+    // --- tracking: dependencies are collected per run ----------------------------
+    const a = ae.signal(0);
+    const b = ae.signal(0);
+    const readB = ae.signal(false);
+    let srcRenders = 0;
+
+    ae('x-src').render((el) => {
+      srcRenders++;
+      el.textContent = readB.value ? `B = ${b.value}` : `A = ${a.value}`;
+      ae('x-src-renders').each((r) => { r.textContent = srcRenders; });
+    });
+    ae('x-a').press(() => { a.value++; });
+    ae('x-b').press(() => { b.value++; });
+    ae('x-swap').press(() => { readB.value = !readB.value; });
+  </script>
+</body>
+</html>

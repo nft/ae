@@ -59,7 +59,7 @@
       <span class="rounded-full border border-amber-700/25 bg-amber-700/5 px-2.5 py-0.5 font-mono text-[11px] text-amber-800">3.9 KB · zero deps</span>
       <div class="ml-auto hidden items-baseline gap-6 text-sm text-stone-500 sm:flex">
         <a href="#cases" class="transition hover:text-ink">Cases</a>
-        <a href="#docs" class="transition hover:text-ink">Docs</a>
+        <a href="reference.html" class="transition hover:text-ink">Reference</a>
         <a href="#guarantees" class="transition hover:text-ink">Guarantees</a>
         <a href="#kanban" class="transition hover:text-ink">Kanban</a>
         <a href="https://www.npmjs.com/package/@aeroapp/ae" class="transition hover:text-ink">npm</a>
@@ -431,9 +431,10 @@ ae('card').on('drop', (el, e) =>    // …and on a card:
     <div class="mx-auto max-w-none xl:px-12 px-6 py-20">
       <span class="font-mono text-[11px] uppercase tracking-widest text-amber-700">docs</span>
       <h2 class="mt-3 font-display text-3xl font-medium tracking-tight">The whole API on one card</h2>
-      <p class="mt-3 max-w-xl text-stone-600">Full semantics, guarantees, and design history live in
-        <a href="../API.md" class="font-medium text-amber-800 underline decoration-amber-700/30 underline-offset-4 hover:decoration-amber-700">API.md</a> —
-        this is everything there is.</p>
+      <p class="mt-3 max-w-xl text-stone-600">Every member is on this card — and every one of them has a page in the
+        <a href="reference.html" class="font-medium text-amber-800 underline decoration-amber-700/30 underline-offset-4 hover:decoration-amber-700">reference</a>,
+        with signatures, gotchas and live examples. The prose spec is
+        <a href="../API.md" class="font-medium text-amber-800 underline decoration-amber-700/30 underline-offset-4 hover:decoration-amber-700">API.md</a>.</p>
 
       <div class="mt-10 grid gap-10 md:grid-cols-2">
         <div>
@@ -463,6 +464,19 @@ ae('card').on('drop', (el, e) =>    // …and on a card:
             <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">.list(items, render, key)</dt><dd class="text-stone-600">keyed template stamping with node reuse</dd></div>
             <div class="flex gap-4"><dt class="w-32 shrink-0 font-mono text-[13px] text-amber-900 sm:w-44">.els / .each(fn)</dt><dd class="text-stone-600">escape hatches to the raw elements</dd></div>
           </dl>
+        </div>
+      </div>
+
+      <div class="mt-12 rounded-2xl border border-amber-700/20 bg-amber-700/5 p-6">
+        <h3 class="font-display text-xl font-medium text-amber-900">Every member, explained — with examples you can press</h3>
+        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600">Five pages: signature, parameters, sharp edges and working samples for each method, plus live demos on the same
+          <code class="font-mono text-[13px]">dist/ae.js</code> this page runs on.</p>
+        <div class="mt-5 flex flex-wrap gap-2 text-sm">
+          <a href="reference.html" class="rounded-lg border border-stone-300 bg-white px-3.5 py-1.5 font-medium text-stone-700 transition hover:border-amber-600 hover:text-amber-800">Handles &amp; lifecycle</a>
+          <a href="reactivity.html" class="rounded-lg border border-stone-300 bg-white px-3.5 py-1.5 font-medium text-stone-700 transition hover:border-amber-600 hover:text-amber-800">Signals &amp; scheduling</a>
+          <a href="bindings.html" class="rounded-lg border border-stone-300 bg-white px-3.5 py-1.5 font-medium text-stone-700 transition hover:border-amber-600 hover:text-amber-800">Rendering &amp; events</a>
+          <a href="forms.html" class="rounded-lg border border-stone-300 bg-white px-3.5 py-1.5 font-medium text-stone-700 transition hover:border-amber-600 hover:text-amber-800">Forms</a>
+          <a href="lists.html" class="rounded-lg border border-stone-300 bg-white px-3.5 py-1.5 font-medium text-stone-700 transition hover:border-amber-600 hover:text-amber-800">Lists</a>
         </div>
       </div>
     </div>
@@ -524,7 +538,8 @@ ae('card').on('drop', (el, e) =>    // …and on a card:
       </a>
       <span>MIT license</span>
       <span>TypeScript</span>
-      <span>3.2 KB min+gzip</span>
+      <span>3.9 KB min+gzip</span>
+      <a href="reference.html" class="transition hover:text-ink">Reference</a>
       <a href="https://www.npmjs.com/package/@aeroapp/ae" class="transition hover:text-ink">npm</a>
       <a href="https://esm.sh/@aeroapp/ae" class="transition hover:text-ink">esm.sh</a>
       <a href="https://cdn.jsdelivr.net/npm/@aeroapp/ae/+esm" class="transition hover:text-ink">jsDelivr</a>
@@ -535,18 +550,7 @@ ae('card').on('drop', (el, e) =>    // …and on a card:
   <script type="importmap">{ "imports": { "@aeroapp/ae": "../dist/ae.js" } }</script>
   <script type="module">
     import { ae } from '@aeroapp/ae';
-
-    // --- tiny highlighter for the code samples ------------------------------
-    for (const el of document.querySelectorAll('code.hl')) {
-      const esc = el.textContent.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-      el.innerHTML = esc.replace(
-        /(\/\/[^\n]*)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`)|\b(const|let|import|from|return|if|new|for|of)\b|\b(ae)\b(?=[.(])|(data-ae)/g,
-        (m, com, str, kw) =>
-          com ? `<span class="text-stone-500">${com}</span>`
-          : str ? `<span class="text-amber-200/90">${str}</span>`
-          : kw ? `<span class="text-orange-300">${kw}</span>`
-          : `<span class="text-amber-400">${m}</span>`);
-    }
+    import './hl.js'; // highlights every <code class="hl"> on the page
 
     // --- hero ----------------------------------------------------------------
     const saves = ae.signal(0);

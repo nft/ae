@@ -115,9 +115,23 @@ View Transition: list enters, exits, and reorders animate in pure CSS, and
 elements with a `view-transition-name` morph — even across lists. Falls back
 to a plain call where unsupported.
 
-Full API and semantics: **[API.md](API.md)**. Compact API reference for AI
-agents: **[llms.txt](llms.txt)**. Live demos: `bun run serve` →
-http://localhost:4242.
+## Docs
+
+Every member gets a signature, its parameters, its sharp edges, worked
+examples, and live demos:
+
+| page | covers |
+|---|---|
+| [Handles & lifecycle](site/reference.html) | `ae(name)`, `ae(name, root)`, `.mount`, `.scope`, `.els`, `.each`, `ae.parts`, `ae.itemOf`, `ae.observe` |
+| [Signals & scheduling](site/reactivity.html) | `ae.signal`, `ae.computed`, `ae.effect`, `ae.isSignal`, `ae.settled`, `ae.transition`, `Reactive<T>` |
+| [Rendering & events](site/bindings.html) | `.render`, `.text`, `.cls`, `.attr`, `.show`, `.press`, `.hover`, `.on` |
+| [Forms](site/forms.html) | `.input` for text, checkbox, number/range, radio groups, and `<select multiple>` |
+| [Lists](site/lists.html) | `.list`, the template, keys, reconciliation, nested lists, animation |
+
+Read it at <https://nft.github.io/ae/reference.html>, or locally with
+`bun run serve` → http://localhost:4242. Full prose spec and design notes:
+**[API.md](API.md)**. Compact API reference for AI agents:
+**[llms.txt](llms.txt)**.
 
 Real app: **[examples/kanban.html](examples/kanban.html)** — a kanban with
 drag & drop, dynamic columns, inline editing, undo, filtering, and

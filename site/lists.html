@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lists — ae reference</title>
+  <meta name="description" content=".list(items, render, key) in ae — native template stamping, keyed reconciliation, nested lists, and View-Transition morphs.">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Committed static build (theme + @apply utilities live in
+       site/tailwind.config.js and site/tailwind.in.css).
+       Regenerate after class changes: bun run site:css -->
+  <link rel="stylesheet" href="tailwind.css">
+  <style>
+    /* View Transitions (the ae.transition demo): tune the browser-driven morphs. */
+    ::view-transition-group(*) { animation-duration: 250ms; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+    @media (prefers-reduced-motion: reduce) {
+      ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+    }
+  </style>
+</head>
+<body class="overflow-x-clip bg-cream font-sans text-ink antialiased">
+
+  <!-- ===== nav ===== -->
+  <nav class="sticky top-0 z-10 border-b border-stone-200/70 bg-cream/85 backdrop-blur">
+    <div class="mx-auto flex max-w-none items-center gap-6 px-6 py-3 xl:px-12">
+      <a href="index.html" class="flex items-center gap-2.5 font-display text-2xl font-semibold tracking-tight text-ink transition-colors hover:text-[#a41821]">
+        <img src="logo.svg" alt="" class="h-8 w-[2.8rem]">
+        <span>ae</span>
+      </a>
+      <span class="hidden rounded-full border border-amber-700/25 bg-amber-700/5 px-2.5 py-0.5 font-mono text-[11px] text-amber-800 sm:inline">reference</span>
+      <div class="ml-auto flex items-baseline gap-6 text-sm text-stone-500">
+        <a href="index.html#cases" class="hidden transition hover:text-ink sm:inline">Tour</a>
+        <a href="index.html#kanban" class="hidden transition hover:text-ink sm:inline">Kanban</a>
+        <a href="https://www.npmjs.com/package/@aeroapp/ae" class="hidden transition hover:text-ink sm:inline">npm</a>
+        <a href="https://github.com/nft/ae" class="transition hover:text-ink">GitHub</a>
+        <a href="../API.md" class="rounded-lg border border-stone-300 px-3 py-1.5 font-medium text-stone-700 transition hover:border-amber-700 hover:text-amber-800">API.md</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="mx-auto grid max-w-none gap-x-12 px-6 pb-16 pt-10 xl:px-12 lg:grid-cols-[15rem_minmax(0,1fr)]">
+
+    <!-- ===== page ===== -->
+    <main class="min-w-0 max-w-3xl space-y-12">
+      <header>
+        <span class="doc-eyebrow">reference · 5 of 5</span>
+        <h1 class="mt-3 font-display text-4xl font-medium tracking-tight">Lists</h1>
+        <p class="mt-4 text-lg leading-relaxed text-stone-600">
+          <code class="doc-code">.list</code> is the one place ae creates DOM for you. It clones the single root element of the container's own
+          <code class="doc-code">&lt;template&gt;</code> once per item and keeps the stamped nodes reconciled by key — reused, moved, or
+          removed — while every <code class="doc-code">data-ae</code> element inside them mounts through the normal lifecycle. No template
+          syntax: the prototype is markup you wrote, and reconciliation is keyed node reuse.
+        </p>
+        <div class="mt-6 flex flex-wrap gap-2">
+          <a href="#list" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">.list(items, render, key)</a>
+          <a href="#template" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">&lt;template&gt;</a>
+          <a href="#keys" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">keys</a>
+          <a href="#reconciliation" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">reconciliation</a>
+          <a href="#nested" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">nested lists</a>
+          <a href="#animating" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 font-mono text-[12px] text-stone-600 transition hover:border-amber-600 hover:text-amber-800">ae.transition</a>
+        </div>
+      </header>
+
+      <!-- ===== .list ===== -->
+      <section id="list" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">.list(items, render, key?)</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">
+          Stamps one node per item into every element the handle matches, and keeps stamping as <code class="doc-code">items</code> changes.
+          Each stamped node gets its own effect running <code class="doc-code">render(el, item, index)</code>, so a node re-renders when its
+          item is replaced by key, when its index moves, or when any signal read inside the callback changes — and only then.
+        </p>
+
+        <div class="doc-sig mt-5">.list&lt;T&gt;(items: Reactive&lt;readonly T[]&gt;, render: (el: HTMLElement, item: T, index: number) =&gt; void, key?: (item: T, index: number) =&gt; unknown): Handle</div>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">items</dt><dd class="text-stone-600">a <a class="doc-link" href="reactivity.html#reactive-type">Reactive</a> array: a signal or computed (reactive), a function <code class="doc-code">(el) =&gt; readonly T[]</code> called with the container and auto-tracked, or a plain array (stamped once)</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">render</dt><dd class="text-stone-600">runs per stamped node, in its own effect — the node first, then the item and its index</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">key</dt><dd class="text-stone-600">identity for reuse; defaults to <code class="doc-code">(item) =&gt; item</code></dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">returns</dt><dd class="text-stone-600">the handle — <code class="doc-code">.list</code> chains like every other binding</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;ul data-ae="todos"&gt;
+  &lt;template&gt;
+    &lt;li&gt;&lt;b data-ae="title"&gt;&lt;/b&gt; &lt;i data-ae="due"&gt;&lt;/i&gt;&lt;/li&gt;
+  &lt;/template&gt;
+&lt;/ul&gt;
+
+const todos = ae.signal([{ id: 1, text: 'Ship it', due: 'fri' }]);
+
+ae('todos').list(todos, (li, todo, i) =&gt; {
+  const p = ae.parts(li);
+  p.title.textContent = `${i + 1}. ${todo.text}`;
+  p.due.textContent = todo.due;
+}, (todo) =&gt; todo.id);</code></pre>
+
+        <p class="mt-5 leading-relaxed text-stone-600">The four shapes <code class="doc-code">items</code> can take:</p>
+
+        <pre class="doc-pre mt-3"><code class="hl">ae('rows').list(rows, renderRow);                  // Signal   — reactive
+ae('rows').list(visible, renderRow);               // Computed — reactive
+ae('rows').list(() =&gt; rows.value.slice(0, 10),     // function — auto-tracked
+                renderRow);
+ae('rows').list(['a', 'b'], renderRow);            // array    — stamped once</code></pre>
+
+        <div class="doc-note mt-5">
+          <strong class="font-semibold text-amber-900">It is a binding, not a call</strong> — like
+          <a class="doc-link" href="reference.html#mount">.mount</a>, <code class="doc-code">.list</code> applies to every element with that
+          name, including containers connected later, and it appends: calling it twice on one handle runs two reconcilers over the same
+          container. Wire each list once. When the container leaves the DOM the reconciler is disposed, every stamped node is removed, and
+          every item effect goes with it.
+        </div>
+
+        <div class="doc-note mt-3">
+          <strong class="font-semibold text-amber-900">Never create scoped handles in <code class="font-mono">render</code></strong> — it
+          re-runs, and <code class="doc-code">ae(name, root)</code> handles are cached and append-only, so the second run stacks duplicate
+          bindings. Per-node wiring belongs in <a class="doc-link" href="reference.html#scope">.scope</a> — see
+          <a class="doc-link" href="lists.html#nested">nested lists</a>.
+        </div>
+      </section>
+
+      <!-- ===== the template ===== -->
+      <section id="template" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">The &lt;template&gt;</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">
+          The container supplies its own item prototype: <code class="doc-code">.list</code> takes the
+          <code class="doc-code">:scope &gt; template</code> if there is one and otherwise the first descendant template, then deep-clones its
+          single root element per item. Template content is inert, so the marked elements inside it bind nothing until a clone is connected.
+        </p>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">lookup</dt><dd class="text-stone-600">direct child first, then the first descendant <code class="doc-code">&lt;template&gt;</code></dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">contents</dt><dd class="text-stone-600">exactly one root element — text and comments around it are ignored, a second element is an error</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">placement</dt><dd class="text-stone-600">stamped nodes are kept at the <em>end</em> of the container, in item order</dd></div>
+        </dl>
+        <pre class="doc-pre mt-5"><code class="hl">&lt;div data-ae="board"&gt;
+  &lt;p data-ae="empty"&gt;No columns yet.&lt;/p&gt;      &lt;!-- static: stays on top --&gt;
+  &lt;template&gt;                                 &lt;!-- :scope &gt; template wins --&gt;
+    &lt;section data-ae="column"&gt;
+      &lt;div data-ae="cards"&gt;
+        &lt;template&gt;&lt;article data-ae="card"&gt;&lt;/article&gt;&lt;/template&gt;
+      &lt;/div&gt;
+    &lt;/section&gt;
+  &lt;/template&gt;
+&lt;/div&gt;
+
+ae('empty').show(() =&gt; cols.value.length === 0);</code></pre>
+
+        <p class="mt-5 leading-relaxed text-stone-600">
+          Because stamps land at the end, static markup — an empty state, a header row, the <code class="doc-code">&lt;template&gt;</code>
+          itself — can live in the container above them and stays untouched. And because the direct-child lookup wins, an outer list never
+          mistakes an inner list's template for its own.
+        </p>
+
+        <div class="doc-note mt-5">
+          <strong class="font-semibold text-amber-900">Two ways to no-op</strong> — a container with no template logs
+          <code class="doc-code">[ae] .list container has no &lt;template&gt;:</code>, and a template whose content is not exactly one
+          element logs <code class="doc-code">[ae] .list &lt;template&gt; must have exactly one root element:</code>. Both go to
+          <code class="doc-code">console.error</code> with the container and bind nothing; the rest of the page keeps working.
+        </div>
+
+        <div class="doc-card mt-6">
+          <p class="font-mono text-[10px] uppercase tracking-widest text-amber-700">live</p>
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <button data-ae="l-tag-add" class="demo-btn">Add tag</button>
+            <button data-ae="l-tag-clear" class="demo-btn">Clear</button>
+          </div>
+          <div data-ae="l-tags" class="mt-4 flex flex-wrap items-center gap-2">
+            <p class="w-full font-mono text-[11px] text-stone-400">static markup — every stamp is appended below it</p>
+            <p data-ae="l-tags-empty" class="w-full rounded-xl border border-dashed border-stone-300 py-4 text-center text-sm text-stone-400">Nothing stamped.</p>
+            <template><span class="rounded-full bg-amber-700/10 px-3 py-1 text-sm text-amber-900"></span></template>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== keys ===== -->
+      <section id="keys" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">Keys</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">
+          The key answers one question per reconcile run: is this item the one that already owns a node? It defaults to the item itself,
+          which is exactly right for unique primitives and for object items you keep by reference. The moment you replace items immutably —
+          <code class="doc-code">{ ...row, done: true }</code> — identity changes on every update, so pass a stable id or nothing is ever
+          reused.
+        </p>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">key</dt><dd class="text-stone-600"><code class="doc-code">(item, index) =&gt; unknown</code> — the index is there for data with no natural id</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">default</dt><dd class="text-stone-600"><code class="doc-code">(item) =&gt; item</code> — item identity</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">compared</dt><dd class="text-stone-600">as <code class="doc-code">Map</code> keys: by value for primitives, by reference for objects</dd></div>
+        </dl>
+
+        <pre class="doc-pre mt-5"><code class="hl">// Default: the item itself. Unique strings need nothing else.
+ae('tags').list(tags, (el, tag) =&gt; { el.textContent = tag; });
+
+// Rows you replace immutably need a stable id, or every update
+// throws away every node and stamps a fresh one.
+ae('rows').list(rows, renderRow, (row) =&gt; row.id);
+
+// No natural id? The index is the honest fallback — nodes then
+// belong to positions rather than to items.
+ae('lines').list(lines, renderLine, (line, i) =&gt; i);</code></pre>
+
+        <div class="doc-note mt-5">
+          <strong class="font-semibold text-amber-900">Duplicate keys</strong> — the first item to claim a key keeps it; collisions later in
+          the same run are logged once as <code class="doc-code">[ae] .list duplicate key, falling back to unkeyed node:</code> and get a
+          fresh node that can never be reused, so they are re-stamped on every run. Every item still renders — the duplicates only lose node
+          reuse.
+        </div>
+      </section>
+
+      <!-- ===== reconciliation ===== -->
+      <section id="reconciliation" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">Reconciliation</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">
+          Every run of the reconciler walks the new array once, matches keys against the nodes it already has, drops what vanished, then
+          positions the survivors back-to-front — only mispositioned nodes actually move. What that buys you, precisely:
+        </p>
+
+        <dl class="mt-4 space-y-2 text-sm">
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">reused key</dt><dd class="text-stone-600">keeps its DOM node; the item and index are written into that node's signals</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">unchanged</dt><dd class="text-stone-600">same item reference at the same index → <code class="doc-code">render</code> does not run again</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">reordered</dt><dd class="text-stone-600">nodes move; the <code class="doc-code">data-ae</code> bindings inside them are <em>not</em> remounted</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">vanished</dt><dd class="text-stone-600">node removed, its item effect disposed, its inner bindings cleaned up</dd></div>
+          <div class="flex gap-4"><dt class="w-28 shrink-0 font-mono text-[12.5px] text-amber-900">unmounted</dt><dd class="text-stone-600">container out of the DOM → reconciler and every item effect disposed</dd></div>
+        </dl>
+
+        <p class="mt-5 leading-relaxed text-stone-600">
+          The no-remount guarantee is what makes state inside a row survive a shuffle — the state ae or the element itself owns: a
+          <a class="doc-link" href="reference.html#mount">.mount</a> that stored a timestamp, an open
+          <code class="doc-code">&lt;details&gt;</code>, a value typed into an input, a class toggled by
+          <code class="doc-code">.cls</code>. Moves are moves —
+          <a class="doc-link" href="reference.html#semantics">net-state lifecycle</a> means reparenting a connected element never re-fires
+          its bindings. Browser-owned state is a different question: a reorder is <code class="doc-code">insertBefore</code> on a node that
+          already has a parent, which detaches it first, so focus leaves the row and an in-flight CSS animation restarts.
+        </p>
+
+        <pre class="doc-pre mt-5"><code class="hl">&lt;div data-ae="rows"&gt;
+  &lt;template&gt;
+    &lt;div&gt;
+      &lt;span data-ae="id"&gt;&lt;/span&gt; &lt;b data-ae="title"&gt;&lt;/b&gt;
+      &lt;span data-ae="mounted"&gt;&lt;/span&gt; &lt;button data-ae="del"&gt;✕&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/template&gt;
+&lt;/div&gt;
+
+const rows = ae.signal([{ id: 1, text: 'parse' }, { id: 2, text: 'stamp' }]);
+
+ae('rows').list(rows, (el, row, i) =&gt; {
+  const p = ae.parts(el);
+  p.id.textContent = `#${row.id}`;      // stable across a shuffle
+  p.title.textContent = `${i + 1}. ${row.text}`;   // index re-renders
+}, (row) =&gt; row.id);
+
+ae('mounted').mount((el) =&gt; {           // once per node, never on a move
+  el.textContent = new Date().toLocaleTimeString();
+});
+
+ae('del').press((btn) =&gt; {
+  const row = ae.itemOf(btn);           // which node was clicked
+  rows.value = rows.value.filter((r) =&gt; r !== row);
+});</code></pre>
+
+        <p class="mt-5 leading-relaxed text-stone-600">
+          Handlers inside stamped nodes recover their item with <a class="doc-link" href="reference.html#item-of">ae.itemOf</a>, and named
+          children come back through <a class="doc-link" href="reference.html#parts">ae.parts</a> — no keys stamped into the DOM, no
+          <code class="doc-code">dataset.id</code> round-trips.
+        </p>
+
+        <div class="doc-card mt-6">
+          <p class="font-mono text-[10px] uppercase tracking-widest text-amber-700">live</p>
+          <p class="mt-2 text-sm leading-relaxed text-stone-500">
+            Shuffle: the id and the mount time travel with each row, only the index number changes. Add: one new node, one new timestamp —
+            the rest are untouched.
+          </p>
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <button data-ae="l-row-add" class="demo-btn">Add row</button>
+            <button data-ae="l-row-shuffle" class="demo-btn">Shuffle</button>
+          </div>
+          <div data-ae="l-rows" class="mt-4 space-y-2">
+            <p data-ae="l-rows-empty" class="rounded-xl border border-dashed border-stone-300 py-6 text-center text-sm text-stone-400">Empty — add a row.</p>
+            <template>
+              <div class="flex items-center gap-3 rounded-xl bg-stone-100/80 px-4 py-2.5">
+                <span data-ae="l-row-id" class="w-8 shrink-0 font-mono text-[11px] text-stone-400"></span>
+                <span data-ae="l-row-title" class="flex-1 text-sm font-medium"></span>
+                <span data-ae="l-row-mounted" class="font-mono text-[11px] text-amber-700"></span>
+                <button data-ae="l-row-del" class="text-sm text-stone-400 transition hover:text-red-600" aria-label="Remove row">✕</button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== nested lists ===== -->
+      <section id="nested" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">Nested lists</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">
+          A list inside a list is three moving parts: the outer list stamps the roots, a
+          <a class="doc-link" href="reference.html#scope">.scope</a> on each stamped root wires that root once, and
+          <a class="doc-link" href="reference.html#handle-scoped">ae(name, root)</a> keeps the inner names private so every column can call
+          its cards <code class="doc-code">card</code>. Derive the inner items with
+          <a class="doc-link" href="reactivity.html#computed">ae.computed</a> from the outer item you recover via
+          <a class="doc-link" href="reference.html#item-of">ae.itemOf</a>.
+        </p>
+
+        <pre class="doc-pre mt-5"><code class="hl">ae('board').list(cols, renderCol, (c) =&gt; c.id);
+
+ae('column').scope((colEl) =&gt; {            // once per stamped column
+  const colId = ae.itemOf(colEl).id;       // the outer item
+  const mine = ae.computed(() =&gt;
+    cards.value.filter((c) =&gt; c.col === colId));
+
+  ae('cards', colEl).list(mine, renderCard, (c) =&gt; c.id);
+  ae('count', colEl).text(() =&gt; mine.value.length);
+  ae('card-del', colEl).press((btn) =&gt; {
+    const card = ae.itemOf(btn);           // innermost item wins
+    cards.value = cards.value.filter((c) =&gt; c !== card);
+  });
+});</code></pre>
+
+        <p class="mt-5 leading-relaxed text-stone-600">
+          <code class="doc-code">.scope</code> is what makes this survive column churn: the scoped handles first created inside its callback
+          are retired when the root unmounts, so a column that comes back is rebuilt against fresh handles instead of stacking a second set
+          of bindings onto the cached ones. Behavior that is identical in every column —
+          <code class="doc-code">ae('card-prio').press(…)</code> — can stay global.
+        </p>
+
+        <div class="doc-note mt-5">
+          <strong class="font-semibold text-amber-900">itemOf resolves innermost</strong> — inside a card,
+          <code class="doc-code">ae.itemOf(el)</code> walks up to the nearest stamped node and returns the card. Reach the column from a
+          card by carrying the column id on the card, or by binding the handler on the column's card container, whose nearest stamped
+          ancestor <em>is</em> the column node.
+        </div>
+      </section>
+
+      <!-- ===== animating changes ===== -->
+      <section id="animating" class="scroll-mt-20 border-t border-stone-200/70 pt-10">
+        <h2 class="font-display text-2xl font-medium tracking-tight">
+          <code class="font-mono text-[21px] text-amber-900">Animating changes</code>
+        </h2>
+        <p class="mt-3 leading-relaxed text-stone-600">
+          Every reconciliation guarantee above holds <em>within one container</em>. An item that moves between two
+          <code class="doc-code">.list</code> containers — a kanban card changing columns — is a removal in one list and a fresh stamp in
+          the other. That is a new DOM node, so transient state on the old node does not travel with it: focus is lost, a running CSS
+          transition restarts, scroll position resets.
+        </p>
+
+        <p class="mt-4 leading-relaxed text-stone-600">
+          Visually this is fixable. Wrap the mutation in <a class="doc-link" href="reactivity.html#transition">ae.transition</a> and give
+          each stamped node a unique <code class="doc-code">view-transition-name</code>: the browser snapshots the old node, takes the new
+          snapshot only once ae has settled, and morphs one into the other across the two containers.
+        </p>
+
+        <pre class="doc-pre mt-5"><code class="hl">const paint = (el, card) =&gt; {
+  el.textContent = card.title;
+  el.style.viewTransitionName = `card-${card.id}`;   // unique per item
+};
+ae('todo').list(open, paint, (c) =&gt; c.id);
+ae('done').list(closed, paint, (c) =&gt; c.id);
+
+ae('card').press((el) =&gt; ae.transition(() =&gt; {
+  const card = ae.itemOf(el);
+  cards.value = cards.value.map((c) =&gt;
+    c === card ? { ...c, done: !c.done } : c);
+}));</code></pre>
+
+        <p class="mt-5 leading-relaxed text-stone-600">
+          The animation itself is CSS. <code class="doc-code">ae.transition</code> returns whatever
+          <code class="doc-code">document.startViewTransition</code> returns, or <code class="doc-code">undefined</code> where View
+          Transitions are unsupported — there <code class="doc-code">fn</code> runs plainly and the change applies at once, so this is an
+          enhancement, never a requirement.
+        </p>
+
+        <pre class="doc-pre mt-3"><code class="hl">::view-transition-group(*) { animation-duration: 250ms; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*) { animation: none !important; }
+}</code></pre>
+
+        <div class="doc-note mt-5">
+          <strong class="font-semibold text-amber-900">Reduced motion is yours</strong> — the browser runs the transition regardless; only
+          your CSS can honor <code class="doc-code">prefers-reduced-motion</code>. And keep
+          <code class="doc-code">view-transition-name</code> unique per visible element: two elements sharing a name in the same snapshot
+          skip the animation.
+        </div>
+
+        <div class="doc-card mt-6">
+          <p class="font-mono text-[10px] uppercase tracking-widest text-amber-700">live</p>
+          <p class="mt-2 text-sm leading-relaxed text-stone-500">
+            Click a chip to send it across. Two containers, two lists — the chip is destroyed and re-stamped, and the morph hides the seam.
+            Chrome 111+ and Safari 18+ animate it; elsewhere it jumps.
+          </p>
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <div data-ae="l-left" class="flex min-h-[96px] flex-wrap content-start gap-2 rounded-xl bg-stone-100/70 p-3">
+              <p class="w-full font-mono text-[10px] uppercase tracking-widest text-stone-400">left</p>
+              <template><button data-ae="l-chip" class="rounded-full bg-amber-700/10 px-3 py-1 text-sm text-amber-900 transition hover:bg-amber-700/20"></button></template>
+            </div>
+            <div data-ae="l-right" class="flex min-h-[96px] flex-wrap content-start gap-2 rounded-xl bg-stone-100/70 p-3">
+              <p class="w-full font-mono text-[10px] uppercase tracking-widest text-stone-400">right</p>
+              <template><button data-ae="l-chip" class="rounded-full bg-amber-700/10 px-3 py-1 text-sm text-amber-900 transition hover:bg-amber-700/20"></button></template>
+            </div>
+          </div>
+        </div>
+
+        <p class="mt-6 leading-relaxed text-stone-600">
+          All of it composed — nested keyed lists, per-column scopes, drag and drop, undo — is the
+          <a class="doc-link" href="index.html#kanban">kanban board</a> on the front page.
+        </p>
+      </section>
+
+      <nav class="flex flex-wrap items-center justify-between gap-4 border-t border-stone-200/70 pt-8 font-medium">
+        <a class="doc-link" href="forms.html">&larr; Forms</a>
+        <a class="doc-link" href="../API.md">The prose spec &rarr;</a>
+      </nav>
+    </main>
+
+    <!-- ===== sidebar (source order after main so mobile reads content first) ===== -->
+    <aside class="mt-16 border-t border-stone-200/70 pt-8 text-sm lg:sticky lg:top-[57px] lg:order-first lg:mt-0 lg:max-h-[calc(100vh-57px)] lg:self-start lg:overflow-y-auto lg:border-0 lg:pb-10 lg:pt-8">
+      <nav aria-label="API reference">
+        <p class="px-2 font-mono text-[11px] uppercase tracking-widest text-stone-400">Every member</p>
+
+        <a href="reference.html" class="mt-4 block px-2 font-medium text-stone-600 hover:text-ink">Handles &amp; lifecycle</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="reference.html#handle">ae(name)</a></li>
+          <li><a class="doc-toc" href="reference.html#handle-scoped">ae(name, root)</a></li>
+          <li><a class="doc-toc" href="reference.html#mount">.mount(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#scope">.scope(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#els">.els</a></li>
+          <li><a class="doc-toc" href="reference.html#each">.each(fn)</a></li>
+          <li><a class="doc-toc" href="reference.html#parts">ae.parts(root)</a></li>
+          <li><a class="doc-toc" href="reference.html#item-of">ae.itemOf(el)</a></li>
+          <li><a class="doc-toc" href="reference.html#observe">ae.observe(root)</a></li>
+          <li><a class="doc-toc" href="reference.html#semantics">Semantics</a></li>
+        </ul>
+
+        <a href="reactivity.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Signals &amp; scheduling</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="reactivity.html#signal">ae.signal(v)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#signal-value">Signal.value</a></li>
+          <li><a class="doc-toc" href="reactivity.html#computed">ae.computed(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#effect">ae.effect(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#is-signal">ae.isSignal(v)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#settled">ae.settled()</a></li>
+          <li><a class="doc-toc" href="reactivity.html#transition">ae.transition(fn)</a></li>
+          <li><a class="doc-toc" href="reactivity.html#reactive-type">Reactive&lt;T&gt;</a></li>
+          <li><a class="doc-toc" href="reactivity.html#tracking">Tracking rules</a></li>
+        </ul>
+
+        <a href="bindings.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Rendering &amp; events</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="bindings.html#render">.render(fn)</a></li>
+          <li><a class="doc-toc" href="bindings.html#text">.text(v)</a></li>
+          <li><a class="doc-toc" href="bindings.html#cls">.cls(name, on?)</a></li>
+          <li><a class="doc-toc" href="bindings.html#attr">.attr(name, v)</a></li>
+          <li><a class="doc-toc" href="bindings.html#show">.show(on)</a></li>
+          <li><a class="doc-toc" href="bindings.html#press">.press(fn)</a></li>
+          <li><a class="doc-toc" href="bindings.html#hover">.hover(enter, leave)</a></li>
+          <li><a class="doc-toc" href="bindings.html#on">.on(type, fn, opts)</a></li>
+        </ul>
+
+        <a href="forms.html" class="mt-6 block px-2 font-medium text-stone-600 hover:text-ink">Forms</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="forms.html#input">.input(signal)</a></li>
+          <li><a class="doc-toc" href="forms.html#text-fields">text · textarea · select</a></li>
+          <li><a class="doc-toc" href="forms.html#checkbox">checkbox</a></li>
+          <li><a class="doc-toc" href="forms.html#number">number · range</a></li>
+          <li><a class="doc-toc" href="forms.html#radio">radio groups</a></li>
+          <li><a class="doc-toc" href="forms.html#multi-select">select multiple</a></li>
+        </ul>
+
+        <a href="lists.html" class="mt-6 block px-2 font-medium text-amber-800" aria-current="page">Lists</a>
+        <ul class="mt-1 space-y-0.5">
+          <li><a class="doc-toc" href="lists.html#list">.list(items, render, key)</a></li>
+          <li><a class="doc-toc" href="lists.html#template">The template</a></li>
+          <li><a class="doc-toc" href="lists.html#keys">Keys</a></li>
+          <li><a class="doc-toc" href="lists.html#reconciliation">Reconciliation</a></li>
+          <li><a class="doc-toc" href="lists.html#nested">Nested lists</a></li>
+          <li><a class="doc-toc" href="lists.html#animating">Animating changes</a></li>
+        </ul>
+
+        <p class="mt-8 px-2 text-[12px] leading-relaxed text-stone-400">
+          Every example on these pages runs against the same
+          <a href="../dist/ae.js" class="underline decoration-stone-300 underline-offset-2 hover:text-stone-600">dist/ae.js</a>
+          the demos load.
+        </p>
+      </nav>
+    </aside>
+  </div>
+
+  <!-- ===== footer ===== -->
+  <footer class="border-t border-stone-200/70">
+    <div class="mx-auto flex max-w-none flex-wrap items-center gap-x-6 gap-y-2 px-6 py-10 text-sm text-stone-500 xl:px-12">
+      <a href="index.html" class="flex items-center gap-2 font-display text-lg font-semibold text-stone-500 transition-colors hover:text-ink">
+        <img src="logo.svg" alt="" class="h-5 w-[1.75rem] opacity-80">
+        <span>ae</span>
+      </a>
+      <span>MIT license</span>
+      <span>3.9 KB min+gzip</span>
+      <a href="../API.md" class="transition hover:text-ink">API.md</a>
+      <a href="https://www.npmjs.com/package/@aeroapp/ae" class="transition hover:text-ink">npm</a>
+      <a href="https://github.com/nft/ae" class="transition hover:text-ink">GitHub</a>
+      <span class="ml-auto">This page runs on ae — view source.</span>
+    </div>
+  </footer>
+
+  <script type="importmap">{ "imports": { "@aeroapp/ae": "../dist/ae.js" } }</script>
+  <script type="module" src="docs.js"></script>
+  <script type="module">
+    import { ae } from '@aeroapp/ae';
+
+    // --- template demo: stamps are appended, static markup stays above -------
+    const TAG_WORDS = ['native', 'inert', 'cloned', 'stamped', 'ordered', 'keyed'];
+    let tagSeq = 0;
+    const nextTag = () => `${TAG_WORDS[tagSeq % TAG_WORDS.length]} ${++tagSeq}`;
+    const tags = ae.signal([nextTag(), nextTag(), nextTag()]);
+
+    ae('l-tags').list(tags, (el, tag) => { el.textContent = tag; });
+    ae('l-tags-empty').show(() => tags.value.length === 0);
+    ae('l-tag-add').press(() => { tags.value = [...tags.value, nextTag()]; });
+    ae('l-tag-clear').press(() => { tags.value = []; });
+
+    // --- reconciliation demo: a shuffle moves nodes, it does not re-stamp ----
+    const ROW_WORDS = ['parse', 'stamp', 'reconcile', 'move', 'dispose'];
+    let rowSeq = 0;
+    const nextRow = () => ({ id: ++rowSeq, text: ROW_WORDS[(rowSeq - 1) % ROW_WORDS.length] });
+    const rows = ae.signal([nextRow(), nextRow(), nextRow()]);
+    const now = () => {
+      const t = new Date();
+      return `${t.toTimeString().slice(0, 8)}.${String(t.getMilliseconds()).padStart(3, '0')}`;
+    };
+
+    ae('l-rows').list(rows, (el, row, i) => {
+      const p = ae.parts(el);
+      p['l-row-id'].textContent = `#${row.id}`;
+      p['l-row-title'].textContent = `${i + 1}. ${row.text}`;
+    }, (row) => row.id);
+    ae('l-rows-empty').show(() => rows.value.length === 0);
+    ae('l-row-mounted').mount((el) => { el.textContent = now(); });
+    ae('l-row-add').press(() => { rows.value = [...rows.value, nextRow()]; });
+    ae('l-row-shuffle').press(() => { rows.value = [...rows.value].sort(() => Math.random() - 0.5); });
+    ae('l-row-del').press((btn) => {
+      const row = ae.itemOf(btn);
+      rows.value = rows.value.filter((r) => r !== row);
+    });
+
+    // --- ae.transition demo: the same chip morphs across two containers ------
+    const CHIP_WORDS = ['alpha', 'beta', 'gamma', 'delta', 'epsilon'];
+    const chips = ae.signal(CHIP_WORDS.map((label, i) => ({ id: i + 1, label, side: i % 2 ? 'right' : 'left' })));
+    const onSide = (side) => ae.computed(() => chips.value.filter((c) => c.side === side));
+    const paintChip = (el, chip) => {
+      el.textContent = chip.label;
+      el.style.viewTransitionName = `l-chip-${chip.id}`;
+    };
+
+    ae('l-left').list(onSide('left'), paintChip, (c) => c.id);
+    ae('l-right').list(onSide('right'), paintChip, (c) => c.id);
+    ae('l-chip').press((btn) => {
+      const chip = ae.itemOf(btn);
+      ae.transition(() => {
+        chips.value = chips.value.map((c) =>
+          c === chip ? { ...c, side: c.side === 'left' ? 'right' : 'left' } : c);
+      });
+    });
+  </script>
+</body>
+</html>
